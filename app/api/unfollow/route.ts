@@ -26,7 +26,8 @@ export async function POST(request: NextRequest) {
     // Unfollow each user with a small delay to avoid rate limits
     for (const targetFid of targetFids) {
       try {
-        await neynarClient.deleteFollow(signerUuid, targetFid);
+        // Neynar SDK'nın doğru metodu: publishReactionRemove veya unfollowUser
+        await (neynarClient as any).unfollowUser(signerUuid, targetFid);
         results.push({ fid: targetFid, success: true });
         
         // Small delay to prevent rate limiting
