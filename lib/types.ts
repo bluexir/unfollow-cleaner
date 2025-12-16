@@ -25,3 +25,11 @@ export interface UnfollowResponse {
 export interface CheckFollowResponse {
   isFollowing: boolean;
 }
+
+// Neynar SDK'nın gerçek response yapısı (SDK'da eksik olan tipler)
+export interface NeynarFollowResponse {
+  users: FarcasterUser[];
+  next?: {
+    cursor: string;
+  };
+}
