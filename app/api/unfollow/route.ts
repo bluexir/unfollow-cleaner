@@ -20,31 +20,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const results = [];
-    const failed = [];
+    try {
+      // Neynar SDK'nın doğru kullanımı - tüm FID'leri bir seferde gönder
+      const result = await neynarClient.unfollowUser(signerUuid, targetFids);
+      
+      // Response'u parse et
+      const successCount = result.details?.filter((d: any) => d.success).length || 0;
+      const failed = result.details?.filter((d: any) => !d.success).map((d: any) => d.target_fid) || [];
 
-    // Unfollow each user with a small delay to avoid rate limits
-    for (const targetFid of targetFids) {
-      try {
-        // Neynar SDK'nın doğru metodu: publishReactionRemove veya unfollowUser
-        await (neynarClient as any).unfollowUser(signerUuid, targetFid);
-        results.push({ fid: targetFid, success: true });
-        
-        // Small delay to prevent rate limiting
-        await new Promise(resolve => setTimeout(resolve, 200));
-      } catch (error: any) {
-        console.error(`Failed to unfollow FID ${targetFid}:`, error);
-        results.push({ fid: targetFid, success: false, error: error.message });
-        failed.push(targetFid);
-      }
+      return NextResponse.json({
+        success: failed.length === 0,
+        message: `Successfully unfollowed ${successCount} out of ${targetFids.length} users`,
+        results: result.details,
+        failed,
+      });
+    } catch (error: any) {
+      console.error('Unfollow API error:', error);
+      return NextResponse.json(
+        { error: error.message || 'Failed to unfollow users' },
+        { status: 500 }
+      );
     }
-
-    return NextResponse.json({
-      success: failed.length === 0,
-      message: `Successfully unfollowed ${targetFids.length - failed.length} out of ${targetFids.length} users`,
-      results,
-      failed,
-    });
   } catch (error: any) {
     console.error('Unfollow error:', error);
     return NextResponse.json(
