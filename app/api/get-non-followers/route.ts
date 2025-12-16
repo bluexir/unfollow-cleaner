@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neynarClient } from '@/lib/neynar';
+import { NeynarFollowResponse, FarcasterUser } from '@/lib/types';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,25 +16,25 @@ export async function POST(request: NextRequest) {
     // Get users the logged-in user follows
     const followingResponse = await neynarClient.fetchUserFollowing(fid, {
       limit: 200,
-    });
+    }) as NeynarFollowResponse;
     const following = followingResponse.users;
 
     // Get users who follow the logged-in user
     const followersResponse = await neynarClient.fetchUserFollowers(fid, {
       limit: 200,
-    });
+    }) as NeynarFollowResponse;
     const followers = followersResponse.users;
 
     // Create a set of follower FIDs for quick lookup
-    const followerFids = new Set(followers.map((user: any) => user.fid));
+    const followerFids = new Set(followers.map((user) => user.fid));
 
     // Filter out users who don't follow back
     const nonFollowers = following.filter(
-      (user: any) => !followerFids.has(user.fid)
+      (user) => !followerFids.has(user.fid)
     );
 
     // Format the response
-    const formattedNonFollowers = nonFollowers.map((user: any) => ({
+    const formattedNonFollowers = nonFollowers.map((user): FarcasterUser => ({
       fid: user.fid,
       username: user.username,
       display_name: user.display_name || user.username,
