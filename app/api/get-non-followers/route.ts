@@ -16,13 +16,13 @@ export async function POST(request: NextRequest) {
     // Get users the logged-in user follows
     const followingResponse = await neynarClient.fetchUserFollowing(fid, {
       limit: 200,
-    }) as NeynarFollowResponse;
+    }) as unknown as NeynarFollowResponse;
     const following = followingResponse.users;
 
     // Get users who follow the logged-in user
     const followersResponse = await neynarClient.fetchUserFollowers(fid, {
       limit: 200,
-    }) as NeynarFollowResponse;
+    }) as unknown as NeynarFollowResponse;
     const followers = followersResponse.users;
 
     // Create a set of follower FIDs for quick lookup
