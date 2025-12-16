@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     // Check if user follows @bluexir
     const response = await neynarClient.fetchUserFollowing(fid, {
       limit: 100,
-    }) as NeynarFollowResponse;
+    }) as unknown as NeynarFollowResponse;
 
     const isFollowing = response.users.some(
       (user) => user.fid === REQUIRED_FOLLOW_FID
