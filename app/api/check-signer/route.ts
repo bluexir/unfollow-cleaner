@@ -42,8 +42,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-```
-
-**Commit message:**
-```
-Add check-signer API endpoint for polling
