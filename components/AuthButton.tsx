@@ -14,7 +14,6 @@ export default function AuthButton({ onAuthSuccess }: AuthButtonProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check localStorage
     const storedAuth = localStorage.getItem('farcaster_auth');
     if (storedAuth) {
       try {
@@ -32,7 +31,6 @@ export default function AuthButton({ onAuthSuccess }: AuthButtonProps) {
   useEffect(() => {
     if (!signerUuid) return;
 
-    // Poll for authentication status
     const pollInterval = setInterval(async () => {
       try {
         const response = await fetch(`/api/check-signer?signer_uuid=${signerUuid}`);
