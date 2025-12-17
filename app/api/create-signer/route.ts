@@ -18,8 +18,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-```
-
-**Commit message:**
-```
-Add create-signer API endpoint
