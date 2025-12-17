@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     const signer = await neynarClient.lookupSigner(signerUuid);
 
-    if (signer.status === 'approved') {
+    if (signer.status === 'approved' && signer.fid) {
       const userResponse = await neynarClient.fetchBulkUsers([signer.fid]);
       const user = userResponse.users[0];
 
