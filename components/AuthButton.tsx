@@ -8,74 +8,130 @@ interface AuthButtonProps {
 
 export default function AuthButton({ onAuthSuccess }: AuthButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+  const [deepLink, setDeepLink] = useState<string | null>(null);
+  const [signerUuid, setSignerUuid] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Check localStorage
     const storedAuth = localStorage.getItem('farcaster_auth');
     if (storedAuth) {
       try {
         const authData = JSON.parse(storedAuth);
-        console.log('Found stored auth:', authData);
         if (authData.signer_uuid && authData.fid) {
           onAuthSuccess(authData);
           return;
         }
       } catch (error) {
-        console.error('Failed to parse stored auth:', error);
         localStorage.removeItem('farcaster_auth');
       }
     }
-
-    const checkUrlParams = () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const signerUuid = urlParams.get('signer_uuid');
-      const fid = urlParams.get('fid');
-      
-      console.log('URL params check:', { signerUuid, fid });
-      
-      if (signerUuid && fid) {
-        const authData = {
-          signer_uuid: signerUuid,
-          fid: parseInt(fid),
-          username: urlParams.get('username') || 'user',
-          display_name: urlParams.get('display_name') || 'User',
-          pfp_url: urlParams.get('pfp_url') || 'https://via.placeholder.com/40',
-        };
-        
-        console.log('Auth successful from callback:', authData);
-        localStorage.setItem('farcaster_auth', JSON.stringify(authData));
-        onAuthSuccess(authData);
-        
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-    };
-
-    checkUrlParams();
   }, [onAuthSuccess]);
 
-  const handleSignIn = () => {
-    setIsLoading(true);
-    const clientId = process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID;
-    
-    if (!clientId) {
-      alert('Neynar Client ID not configured');
-      setIsLoading(false);
-      return;
-    }
+  useEffect(() => {
+    if (!signerUuid) return;
 
-    const redirectUrl = window.location.origin;
-    const authUrl = `https://app.neynar.com/login?client_id=${clientId}&redirect_url=${encodeURIComponent(redirectUrl)}`;
-    
-    console.log('Redirecting to:', authUrl);
-    window.location.href = authUrl;
+    // Poll for authentication status
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/check-signer?signer_uuid=${signerUuid}`);
+        const data = await response.json();
+
+        if (data.authenticated && data.user) {
+          const authData = {
+            signer_uuid: signerUuid,
+            fid: data.user.fid,
+            username: data.user.username,
+            display_name: data.user.display_name,
+            pfp_url: data.user.pfp_url,
+          };
+
+          localStorage.setItem('farcaster_auth', JSON.stringify(authData));
+          onAuthSuccess(authData);
+          clearInterval(pollInterval);
+        }
+      } catch (error) {
+        console.error('Poll error:', error);
+      }
+    }, 2000);
+
+    return () => clearInterval(pollInterval);
+  }, [signerUuid, onAuthSuccess]);
+
+  const handleSignIn = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/create-signer', {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setQrCodeUrl(data.qr_code_url);
+      setDeepLink(data.deep_link);
+      setSignerUuid(data.signer_uuid);
+      setIsLoading(false);
+    } catch (error: any) {
+      setError(error.message || 'Failed to create signer');
+      setIsLoading(false);
+    }
   };
 
+  if (qrCodeUrl) {
+    return (
+      <div className="text-center">
+        <h3 className="text-xl font-bold mb-4">Scan with Warpcast</h3>
+        <div className="bg-white p-4 rounded-lg inline-block mb-4">
+          <img src={qrCodeUrl} alt="QR Code" className="w-64 h-64" />
+        </div>
+        <p className="text-gray-400 text-sm mb-4">
+          Scan this QR code with your Warpcast mobile app
+        </p>
+        {deepLink && (
+          
+            href={deepLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-farcaster-purple hover:bg-purple-700 text-white font-medium py-2 px-6 rounded-lg inline-block mb-2"
+          >
+            Open in Warpcast
+          </a>
+        )}
+        <button
+          onClick={() => {
+            setQrCodeUrl(null);
+            setDeepLink(null);
+            setSignerUuid(null);
+          }}
+          className="block mx-auto text-gray-400 hover:text-white text-sm mt-4"
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <button
-      onClick={handleSignIn}
-      disabled={isLoading}
-      className="bg-farcaster-purple hover:bg-purple-700 disabled:bg-gray-600 text-white font-bold py-3 px-8 rounded-lg transition-colors duration-200"
-    >
-      {isLoading ? 'Redirecting to Neynar...' : 'Sign in with Farcaster'}
-    </button>
+    <div className="text-center">
+      {error && (
+        <div className="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+      <button
+        onClick={handleSignIn}
+        disabled={isLoading}
+        className="bg-farcaster-purple hover:bg-purple-700 disabled:bg-gray-600 text-white font-bold py-3 px-8 rounded-lg transition-colors duration-200"
+      >
+        {isLoading ? 'Loading...' : 'Sign in with Farcaster'}
+      </button>
+    </div>
   );
 }
