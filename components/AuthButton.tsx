@@ -93,12 +93,7 @@ export default function AuthButton({ onAuthSuccess }: AuthButtonProps) {
           Scan this QR code with your Warpcast mobile app
         </p>
         {deepLink && (
-          
-            href={deepLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-farcaster-purple hover:bg-purple-700 text-white font-medium py-2 px-6 rounded-lg inline-block mb-2"
-          >
+          <a href={deepLink} target="_blank" rel="noopener noreferrer" className="bg-farcaster-purple hover:bg-purple-700 text-white font-medium py-2 px-6 rounded-lg inline-block mb-2">
             Open in Warpcast
           </a>
         )}
