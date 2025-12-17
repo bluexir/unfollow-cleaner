@@ -57,7 +57,7 @@ export default function AuthButton({ onAuthSuccess }: AuthButtonProps) {
     return () => clearInterval(pollInterval);
   }, [signerUuid, onAuthSuccess]);
 
-  const handleSignIn = async () => {
+ const handleSignIn = async () => {
     setIsLoading(true);
     setError(null);
 
