@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { NeynarAuthButton, useNeynarContext } from '@neynar/react';
 
 interface AuthButtonProps {
   onAuthSuccess: (data: any) => void;
 }
 
 export default function AuthButton({ onAuthSuccess }: AuthButtonProps) {
-  const [isLoading, setIsLoading] = useState(false);
+  const { user } = useNeynarContext();
 
   useEffect(() => {
     const storedAuth = localStorage.getItem('farcaster_auth');
@@ -23,47 +24,23 @@ export default function AuthButton({ onAuthSuccess }: AuthButtonProps) {
       }
     }
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    
-    if (code && !isLoading) {
-      setIsLoading(true);
+    if (user && user.fid) {
+      const authData = {
+        signer_uuid: user.signer_uuid || 'sdk',
+        fid: user.fid,
+        username: user.username,
+        display_name: user.display_name || user.username,
+        pfp_url: user.pfp_url || '',
+      };
       
-      fetch(`/api/neynar-callback?code=${code}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.fid) {
-            localStorage.setItem('farcaster_auth', JSON.stringify(data));
-            onAuthSuccess(data);
-            window.history.replaceState({}, document.title, window.location.pathname);
-          }
-        })
-        .catch(console.error)
-        .finally(() => setIsLoading(false));
+      localStorage.setItem('farcaster_auth', JSON.stringify(authData));
+      onAuthSuccess(authData);
     }
-  }, [onAuthSuccess, isLoading]);
-
-  const handleSignIn = () => {
-    const clientId = process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID;
-    const redirectUrl = window.location.origin;
-    const authUrl = `https://app.neynar.com/login?client_id=${clientId}&redirect_url=${encodeURIComponent(redirectUrl)}`;
-    window.location.href = authUrl;
-  };
-
-  if (isLoading) {
-    return (
-      <div className="text-center">
-        <div className="text-gray-400">Completing sign in...</div>
-      </div>
-    );
-  }
+  }, [user, onAuthSuccess]);
 
   return (
-    <button
-      onClick={handleSignIn}
-      className="bg-farcaster-purple hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-lg transition-colors duration-200"
-    >
-      Sign in with Farcaster
-    </button>
+    <div className="flex justify-center">
+      <NeynarAuthButton />
+    </div>
   );
 }
