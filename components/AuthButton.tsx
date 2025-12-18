@@ -1,18 +1,20 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 interface AuthButtonProps {
   onAuthSuccess: (data: any) => void;
 }
 
 export default function AuthButton({ onAuthSuccess }: AuthButtonProps) {
+  const [isLoading, setIsLoading] = useState(false);
+
   useEffect(() => {
     const storedAuth = localStorage.getItem('farcaster_auth');
     if (storedAuth) {
       try {
         const authData = JSON.parse(storedAuth);
-        if (authData.signer_uuid && authData.fid) {
+        if (authData.fid) {
           onAuthSuccess(authData);
           return;
         }
@@ -22,23 +24,24 @@ export default function AuthButton({ onAuthSuccess }: AuthButtonProps) {
     }
 
     const urlParams = new URLSearchParams(window.location.search);
-    const signerUuid = urlParams.get('signer_uuid');
-    const fid = urlParams.get('fid');
+    const code = urlParams.get('code');
     
-    if (signerUuid && fid) {
-      const authData = {
-        signer_uuid: signerUuid,
-        fid: parseInt(fid),
-        username: urlParams.get('username') || 'user',
-        display_name: urlParams.get('display_name') || 'User',
-        pfp_url: urlParams.get('pfp_url') || '',
-      };
+    if (code && !isLoading) {
+      setIsLoading(true);
       
-      localStorage.setItem('farcaster_auth', JSON.stringify(authData));
-      onAuthSuccess(authData);
-      window.history.replaceState({}, document.title, window.location.pathname);
+      fetch(`/api/neynar-callback?code=${code}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.fid) {
+            localStorage.setItem('farcaster_auth', JSON.stringify(data));
+            onAuthSuccess(data);
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        })
+        .catch(console.error)
+        .finally(() => setIsLoading(false));
     }
-  }, [onAuthSuccess]);
+  }, [onAuthSuccess, isLoading]);
 
   const handleSignIn = () => {
     const clientId = process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID;
@@ -46,6 +49,14 @@ export default function AuthButton({ onAuthSuccess }: AuthButtonProps) {
     const authUrl = `https://app.neynar.com/login?client_id=${clientId}&redirect_url=${encodeURIComponent(redirectUrl)}`;
     window.location.href = authUrl;
   };
+
+  if (isLoading) {
+    return (
+      <div className="text-center">
+        <div className="text-gray-400">Completing sign in...</div>
+      </div>
+    );
+  }
 
   return (
     <button
