@@ -7,10 +7,13 @@ export async function POST(request: NextRequest) {
   try {
     const signer = await neynarClient.createSigner();
 
+    const deepLink = `https://warpcast.com/~/siwn?token=${signer.signer_uuid}`;
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(deepLink)}`;
+
     return NextResponse.json({
       signer_uuid: signer.signer_uuid,
-      qr_code_url: signer.signer_approval_url,
-      deep_link: `https://warpcast.com/~/siwn?token=${signer.signer_uuid}`,
+      qr_code_url: qrCodeUrl,
+      deep_link: deepLink,
     });
   } catch (error: any) {
     console.error('Create signer error:', error);
@@ -20,4 +23,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
