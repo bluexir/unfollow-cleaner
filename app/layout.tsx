@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
-import { NeynarContextProvider, Theme } from '@neynar/react';
+import { Providers } from './providers';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -18,14 +18,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <NeynarContextProvider
-          settings={{
-            clientId: process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID || '',
-            defaultTheme: Theme.Dark,
-          }}
-        >
+        <Providers>
           {children}
-        </NeynarContextProvider>
+        </Providers>
       </body>
     </html>
   );
