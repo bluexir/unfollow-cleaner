@@ -25,8 +25,8 @@ export async function GET(request: NextRequest) {
       limit: 200,
     });
 
-    const following = followingResponse.result.users;
-    const followers = followersResponse.result.users;
+    const following = followingResponse.result.users as any[];
+    const followers = followersResponse.result.users as any[];
 
     const followerFids = new Set(followers.map(u => u.fid));
 
@@ -35,9 +35,9 @@ export async function GET(request: NextRequest) {
       .map(user => ({
         fid: user.fid,
         username: user.username,
-        display_name: user.displayName || user.username,
-        pfp_url: user.pfpUrl || '',
-        follower_count: user.followerCount || 0,
+        display_name: user.display_name || user.displayName || user.username,
+        pfp_url: user.pfp_url || user.pfpUrl || user.pfp?.url || '',
+        follower_count: user.follower_count || user.followerCount || 0,
       }));
 
     return NextResponse.json({
