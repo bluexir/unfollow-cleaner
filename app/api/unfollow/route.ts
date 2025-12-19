@@ -1,46 +1,40 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { neynarClient } from '@/lib/neynar';
 
 export async function POST(request: NextRequest) {
   try {
-    const { signerUuid, targetFids } = await request.json();
+    const body = await request.json();
+    const { signer_uuid, target_fids } = body;
 
-    if (!signerUuid || !targetFids || !Array.isArray(targetFids)) {
+    if (!signer_uuid || !target_fids || !Array.isArray(target_fids)) {
       return NextResponse.json(
-        { error: 'Signer UUID and target FIDs are required' },
+        { error: 'Invalid request body' },
         { status: 400 }
       );
     }
 
-    // Limit to 50 unfollows per request to avoid rate limits
-    if (targetFids.length > 50) {
-      return NextResponse.json(
-        { error: 'Maximum 50 users can be unfollowed at once' },
-        { status: 400 }
-      );
+    const results = [];
+
+    for (const targetFid of target_fids) {
+      try {
+        await neynarClient.deleteFollow(signer_uuid, targetFid);
+        results.push({ fid: targetFid, success: true });
+      } catch (error: any) {
+        console.error(`Failed to unfollow ${targetFid}:`, error);
+        results.push({ fid: targetFid, success: false, error: error.message });
+      }
     }
 
-    try {
-      // Neynar SDK'nın doğru kullanımı - tüm FID'leri bir seferde gönder
-      const result = await neynarClient.unfollowUser(signerUuid, targetFids);
-      
-      // Response'u parse et
-      const successCount = result.details?.filter((d: any) => d.success).length || 0;
-      const failed = result.details?.filter((d: any) => !d.success).map((d: any) => d.target_fid) || [];
+    const successCount = results.filter(r => r.success).length;
 
-      return NextResponse.json({
-        success: failed.length === 0,
-        message: `Successfully unfollowed ${successCount} out of ${targetFids.length} users`,
-        results: result.details,
-        failed,
-      });
-    } catch (error: any) {
-      console.error('Unfollow API error:', error);
-      return NextResponse.json(
-        { error: error.message || 'Failed to unfollow users' },
-        { status: 500 }
-      );
-    }
+    return NextResponse.json({
+      success: true,
+      unfollowed: successCount,
+      total: target_fids.length,
+      results,
+    });
   } catch (error: any) {
     console.error('Unfollow error:', error);
     return NextResponse.json(
