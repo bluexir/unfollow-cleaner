@@ -18,6 +18,13 @@ export async function GET(request: NextRequest) {
     const bluexirUser = await neynarClient.lookupUserByUsername('bluexir');
     const bluexirFid = bluexirUser.result.user.fid;
 
+    if (parseInt(fid) === bluexirFid) {
+      return NextResponse.json({
+        isFollowing: true,
+        isBluexir: true,
+      });
+    }
+
     const followersResponse = await neynarClient.fetchUserFollowers(bluexirFid, {
       limit: 100,
     });
@@ -28,6 +35,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       isFollowing,
+      isBluexir: false,
     });
   } catch (error: any) {
     console.error('Check follow error:', error);
@@ -37,3 +45,5 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+https://unfollow-cleaner.vercel.app
