@@ -8,92 +8,69 @@ interface FollowGateProps {
 }
 
 export default function FollowGate({ userFid, onFollowVerified }: FollowGateProps) {
-  const [isChecking, setIsChecking] = useState(true);
-  const [isFollowing, setIsFollowing] = useState(false);
-
-  const checkFollowStatus = async () => {
-    setIsChecking(true);
-    try {
-      const response = await fetch('/api/check-follow', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fid: userFid }),
-      });
-
-      const data = await response.json();
-      
-      if (data.isFollowing) {
-        setIsFollowing(true);
-        onFollowVerified();
-      } else {
-        setIsFollowing(false);
-      }
-    } catch (error) {
-      console.error('Failed to check follow status:', error);
-    } finally {
-      setIsChecking(false);
-    }
-  };
+  const [isChecking, setIsChecking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    checkFollowStatus();
-  }, [userFid]);
+    const checkFollow = async () => {
+      try {
+        const response = await fetch(`/api/check-follow?fid=${userFid}`);
+        const data = await response.json();
 
-  if (isChecking) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-farcaster-purple mx-auto mb-4"></div>
-          <p className="text-gray-400">Checking follow status...</p>
-        </div>
-      </div>
-    );
-  }
+        if (data.isFollowing) {
+          onFollowVerified();
+        }
+      } catch (error) {
+        console.error('Follow check error:', error);
+      }
+    };
 
-  if (isFollowing) {
-    return null; // User is following, allow access
-  }
+    setIsChecking(true);
+    checkFollow();
+
+    const interval = setInterval(checkFollow, 3000);
+
+    return () => clearInterval(interval);
+  }, [userFid, onFollowVerified]);
+
+  const handleFollowClick = () => {
+    window.open('https://warpcast.com/bluexir', '_blank');
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="bg-farcaster-dark border border-gray-700 rounded-lg p-8 max-w-md w-full text-center">
+    <div className="max-w-2xl mx-auto text-center py-12">
+      <div className="bg-gradient-to-br from-farcaster-purple/20 to-purple-900/20 border border-farcaster-purple/30 rounded-2xl p-8 backdrop-blur-sm">
         <div className="mb-6">
-          <svg
-            className="w-16 h-16 mx-auto mb-4 text-farcaster-purple"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-            />
-          </svg>
-          <h2 className="text-2xl font-bold mb-2">Follow Required</h2>
-          <p className="text-gray-400 mb-6">
-            To use this tool, you must follow{' '}
-            <span className="text-farcaster-purple font-semibold">@bluexir</span> on
-            Farcaster. This ensures community support and helps maintain the service.
+          <div className="w-20 h-20 bg-farcaster-purple/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-10 h-10 text-farcaster-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </div>
+          <h2 className="text-3xl font-bold mb-3">Follow Required</h2>
+          <p className="text-gray-400 text-lg">
+            To use Unfollow Cleaner, please follow @bluexir
           </p>
         </div>
 
-        <a
-          href="https://warpcast.com/bluexir"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="bg-farcaster-purple hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg inline-block mb-4 transition-colors duration-200"
-        >
-          Follow @bluexir
-        </a>
+        {error && (
+          <div className="bg-red-900/50 border border-red-700 text-red-200 px-4 py-3 rounded-lg mb-6">
+            {error}
+          </div>
+        )}
 
         <button
-          onClick={checkFollowStatus}
-          className="block w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+          onClick={handleFollowClick}
+          disabled={isChecking}
+          className="bg-farcaster-purple hover:bg-purple-700 disabled:bg-gray-600 text-white font-bold py-4 px-8 rounded-lg transition-all duration-200 transform hover:scale-105"
         >
-          I've Followed - Check Again
+          Follow @bluexir
         </button>
+
+        {isChecking && (
+          <p className="text-sm text-gray-500 mt-4">
+            Checking follow status...
+          </p>
+        )}
       </div>
     </div>
   );
