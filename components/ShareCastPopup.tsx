@@ -1,4 +1,3 @@
-```
 'use client';
 
 import { useState } from 'react';
@@ -62,5 +61,4 @@ export default function ShareCastPopup({ unfollowCount, onClose }: ShareCastPopu
       </div>
     </div>
   );
-} 
-```
+}
