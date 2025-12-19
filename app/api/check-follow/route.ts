@@ -45,5 +45,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
-https://unfollow-cleaner.vercel.app
