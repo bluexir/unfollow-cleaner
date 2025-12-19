@@ -1,7 +1,6 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { neynarClient } from '@/lib/neynar';
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,12 +18,31 @@ export async function POST(request: NextRequest) {
 
     for (const targetFid of target_fids) {
       try {
-        await neynarClient.deleteFollow(signer_uuid, targetFid);
-        results.push({ fid: targetFid, success: true });
+        const response = await fetch('https://api.neynar.com/v2/farcaster/user/follow', {
+          method: 'DELETE',
+          headers: {
+            'accept': 'application/json',
+            'api_key': process.env.NEYNAR_API_KEY!,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            signer_uuid: signer_uuid,
+            target_fids: [targetFid],
+          }),
+        });
+
+        if (response.ok) {
+          results.push({ fid: targetFid, success: true });
+        } else {
+          const errorData = await response.json();
+          results.push({ fid: targetFid, success: false, error: errorData.message });
+        }
       } catch (error: any) {
         console.error(`Failed to unfollow ${targetFid}:`, error);
         results.push({ fid: targetFid, success: false, error: error.message });
       }
+
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     const successCount = results.filter(r => r.success).length;
