@@ -7,18 +7,6 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'Unfollow Cleaner - Clean Up Your Farcaster Following List',
   description: 'Discover who doesn\'t follow you back on Farcaster and clean up your following list with ease.',
-  openGraph: {
-    title: 'Unfollow Cleaner',
-    description: 'Clean up your Farcaster following list',
-    images: ['/og-image.png'],
-  },
-  other: {
-    'fc:frame': 'vNext',
-    'fc:frame:image': 'https://unfollow-cleaner.vercel.app/og-image.png',
-    'fc:frame:button:1': 'Open Unfollow Cleaner',
-    'fc:frame:button:1:action': 'link',
-    'fc:frame:button:1:target': 'https://unfollow-cleaner.vercel.app/app',
-  },
 };
 
 export default function RootLayout({
