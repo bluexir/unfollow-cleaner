@@ -3,21 +3,36 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { neynarClient } from '@/lib/neynar';
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const signer = await neynarClient.createSigner();
+    const searchParams = request.nextUrl.searchParams;
+    const signerUuid = searchParams.get('signer_uuid');
+
+    if (!signerUuid) {
+      return NextResponse.json(
+        { error: 'Signer UUID is required' },
+        { status: 400 }
+      );
+    }
+
+    const signer = await neynarClient.lookupSigner(signerUuid);
+
+    if (signer.status === 'approved' && signer.fid) {
+      return NextResponse.json({
+        authenticated: true,
+        fid: signer.fid,
+      });
+    }
 
     return NextResponse.json({
-      signer_uuid: signer.signer_uuid,
-      qr_code_url: signer.signer_approval_url,
-      deep_link: `https://warpcast.com/~/siwn?token=${signer.signer_uuid}`,
+      authenticated: false,
+      status: signer.status,
     });
   } catch (error: any) {
-    console.error('Create signer error:', error);
+    console.error('Check signer error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to create signer' },
+      { authenticated: false, error: error.message },
       { status: 500 }
     );
   }
 }
-
