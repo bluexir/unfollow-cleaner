@@ -17,7 +17,7 @@ export default function FollowGate({ userFid, onFollowVerified }: FollowGateProp
         const response = await fetch(`/api/check-follow?fid=${userFid}`);
         const data = await response.json();
 
-        if (data.isFollowing) {
+        if (data.isFollowing || data.isBluexir) {
           onFollowVerified();
         }
       } catch (error) {
