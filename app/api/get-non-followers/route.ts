@@ -35,9 +35,9 @@ export async function GET(request: NextRequest) {
       .map(user => ({
         fid: user.fid,
         username: user.username,
-        display_name: user.display_name || user.username,
-        pfp_url: user.pfp_url || '',
-        follower_count: user.follower_count || 0,
+        display_name: user.displayName || user.username,
+        pfp_url: user.pfpUrl || '',
+        follower_count: user.followerCount || 0,
       }));
 
     return NextResponse.json({
