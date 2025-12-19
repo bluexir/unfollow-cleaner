@@ -1,10 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { neynarClient, REQUIRED_FOLLOW_FID } from '@/lib/neynar';
-import { NeynarFollowResponse } from '@/lib/types';
+export const dynamic = 'force-dynamic';
 
-export async function POST(request: NextRequest) {
+import { NextRequest, NextResponse } from 'next/server';
+import { neynarClient } from '@/lib/neynar';
+
+export async function GET(request: NextRequest) {
   try {
-    const { fid } = await request.json();
+    const searchParams = request.nextUrl.searchParams;
+    const fid = searchParams.get('fid');
 
     if (!fid) {
       return NextResponse.json(
@@ -13,16 +15,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user follows @bluexir
-    const response = await neynarClient.fetchUserFollowing(fid, {
-      limit: 100,
-    }) as unknown as NeynarFollowResponse;
+    const bluexirUser = await neynarClient.lookupUserByUsername('bluexir');
+    const bluexirFid = bluexirUser.result.user.fid;
 
-    const isFollowing = response.users.some(
-      (user) => user.fid === REQUIRED_FOLLOW_FID
+    const followersResponse = await neynarClient.fetchUserFollowers(bluexirFid, {
+      limit: 100,
+    });
+
+    const isFollowing = followersResponse.result.users.some(
+      (user) => user.fid === parseInt(fid)
     );
 
-    return NextResponse.json({ isFollowing });
+    return NextResponse.json({
+      isFollowing,
+    });
   } catch (error: any) {
     console.error('Check follow error:', error);
     return NextResponse.json(
@@ -31,4 +37,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
