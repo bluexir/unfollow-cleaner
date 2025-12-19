@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import ShareCastPopup from './ShareCastPopup';
+import ShareCastPopup from './ShareCastPopup.tsx';
 
 interface NonFollower {
   fid: number;
