@@ -1,10 +1,12 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { neynarClient } from '@/lib/neynar';
-import { NeynarFollowResponse, FarcasterUser } from '@/lib/types';
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const { fid } = await request.json();
+    const searchParams = request.nextUrl.searchParams;
+    const fid = searchParams.get('fid');
 
     if (!fid) {
       return NextResponse.json(
@@ -13,44 +15,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get users the logged-in user follows
-    const followingResponse = await neynarClient.fetchUserFollowing(fid, {
+    const userFid = parseInt(fid);
+
+    const followingResponse = await neynarClient.fetchUserFollowing(userFid, {
       limit: 200,
-    }) as unknown as NeynarFollowResponse;
-    const following = followingResponse.users;
+    });
 
-    // Get users who follow the logged-in user
-    const followersResponse = await neynarClient.fetchUserFollowers(fid, {
+    const followersResponse = await neynarClient.fetchUserFollowers(userFid, {
       limit: 200,
-    }) as unknown as NeynarFollowResponse;
-    const followers = followersResponse.users;
+    });
 
-    // Create a set of follower FIDs for quick lookup
-    const followerFids = new Set(followers.map((user) => user.fid));
+    const following = followingResponse.result.users;
+    const followers = followersResponse.result.users;
 
-    // Filter out users who don't follow back
-    const nonFollowers = following.filter(
-      (user) => !followerFids.has(user.fid)
-    );
+    const followerFids = new Set(followers.map(u => u.fid));
 
-    // Format the response
-    const formattedNonFollowers = nonFollowers.map((user): FarcasterUser => ({
-      fid: user.fid,
-      username: user.username,
-      display_name: user.display_name || user.username,
-      pfp_url: user.pfp_url,
-      profile: {
-        bio: {
-          text: user.profile?.bio?.text || '',
-        },
-      },
-      follower_count: user.follower_count || 0,
-      following_count: user.following_count || 0,
-    }));
+    const nonFollowers = following
+      .filter(user => !followerFids.has(user.fid))
+      .map(user => ({
+        fid: user.fid,
+        username: user.username,
+        display_name: user.display_name || user.username,
+        pfp_url: user.pfp_url || '',
+        follower_count: user.follower_count || 0,
+      }));
 
     return NextResponse.json({
-      nonFollowers: formattedNonFollowers,
-      total: formattedNonFollowers.length,
+      nonFollowers,
+      total: nonFollowers.length,
     });
   } catch (error: any) {
     console.error('Get non-followers error:', error);
