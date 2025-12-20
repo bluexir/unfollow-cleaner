@@ -18,8 +18,8 @@ export const metadata: Metadata = {
     'fc:frame:image': 'https://unfollow-cleaner.vercel.app/api/og',
     'fc:frame:image:aspect_ratio': '1.91:1',
     'fc:frame:button:1': 'Open App',
-    'fc:frame:button:1:action': 'link',
-    'fc:frame:button:1:target': 'https://unfollow-cleaner.vercel.app/app',
+    'fc:frame:button:1:action': 'post',
+    'fc:frame:post_url': 'https://unfollow-cleaner.vercel.app/api/frame',
   },
 };
 
