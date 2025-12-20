@@ -78,7 +78,7 @@ export default function PermissionGate({ userFid, onPermissionGranted }: Permiss
             </p>
           </div>
 
-          
+          <a
             href={approvalUrl}
             target="_blank"
             rel="noopener noreferrer"
