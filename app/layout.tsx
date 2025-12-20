@@ -10,12 +10,12 @@ export const metadata: Metadata = {
   description: 'Discover who doesn\'t follow you back on Farcaster and clean up your following list with ease.',
   openGraph: {
     title: 'Unfollow Cleaner',
-    description: 'Clean up your Farcaster following list. Find who doesn\'t follow you back.',
-    images: ['/frame-image.png'],
+    description: 'Clean up your Farcaster following list',
+    images: ['/api/og'],
   },
   other: {
     'fc:frame': 'vNext',
-    'fc:frame:image': 'https://unfollow-cleaner.vercel.app/frame-image.png',
+    'fc:frame:image': 'https://unfollow-cleaner.vercel.app/api/og',
     'fc:frame:image:aspect_ratio': '1.91:1',
     'fc:frame:button:1': 'Open App',
     'fc:frame:button:1:action': 'link',
