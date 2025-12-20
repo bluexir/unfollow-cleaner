@@ -1,0 +1,15 @@
+{
+  "accountAssociation": {
+    "header": "",
+    "payload": "",
+    "signature": ""
+  },
+  "frame": {
+    "version": "0.0.0",
+    "name": "Unfollow Cleaner",
+    "iconUrl": "https://unfollow-cleaner.vercel.app/api/icon",
+    "splashImageUrl": "https://unfollow-cleaner.vercel.app/api/splash",
+    "splashBackgroundColor": "#8B5CF6",
+    "homeUrl": "https://unfollow-cleaner.vercel.app/app"
+  }
+}
