@@ -5,8 +5,22 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://unfollow-cleaner.vercel.app'),
   title: 'Unfollow Cleaner - Clean Up Your Farcaster Following List',
   description: 'Discover who doesn\'t follow you back on Farcaster and clean up your following list with ease.',
+  openGraph: {
+    title: 'Unfollow Cleaner',
+    description: 'Clean up your Farcaster following list. Find who doesn\'t follow you back.',
+    images: ['/frame-image.png'],
+  },
+  other: {
+    'fc:frame': 'vNext',
+    'fc:frame:image': 'https://unfollow-cleaner.vercel.app/frame-image.png',
+    'fc:frame:image:aspect_ratio': '1.91:1',
+    'fc:frame:button:1': 'Open App',
+    'fc:frame:button:1:action': 'link',
+    'fc:frame:button:1:target': 'https://unfollow-cleaner.vercel.app/app',
+  },
 };
 
 export default function RootLayout({
@@ -16,13 +30,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        <meta property="fc:frame" content="vNext" />
-        <meta property="fc:frame:image" content="https://unfollow-cleaner.vercel.app/og-image.png" />
-        <meta property="fc:frame:button:1" content="Open Unfollow Cleaner" />
-        <meta property="fc:frame:button:1:action" content="link" />
-        <meta property="fc:frame:button:1:target" content="https://unfollow-cleaner.vercel.app/app" />
-      </head>
       <body className={inter.className}>
         {children}
       </body>
