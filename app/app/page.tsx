@@ -31,14 +31,17 @@ function AppContent() {
   const [permissionGranted, setPermissionGranted] = useState(false);
 
   useEffect(() => {
+    // Signal to Farcaster that app is ready
     if (typeof window !== 'undefined' && window.Farcaster?.Actions) {
       window.Farcaster.Actions.ready();
     }
 
     const getFid = () => {
+      // First try URL parameter
       const urlFid = searchParams.get('fid');
       if (urlFid) return urlFid;
       
+      // Then try Farcaster context
       if (typeof window !== 'undefined' && window.Farcaster?.context?.user?.fid) {
         return window.Farcaster.context.user.fid.toString();
       }
@@ -95,27 +98,54 @@ function AppContent() {
       <header className="border-b border-gray-700 bg-farcaster-darker sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <svg className="w-8 h-8 text-farcaster-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            <svg
+              className="w-8 h-8 text-farcaster-purple"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
             </svg>
             <h1 className="text-xl font-bold">Unfollow Cleaner</h1>
           </div>
+
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              {user.pfp_url && <img src={user.pfp_url} alt={user.username} className="w-8 h-8 rounded-full" />}
+              {user.pfp_url && (
+                <img
+                  src={user.pfp_url}
+                  alt={user.username}
+                  className="w-8 h-8 rounded-full"
+                />
+              )}
               <span className="hidden sm:inline text-sm">@{user.username}</span>
             </div>
-            <button onClick={handleSignOut} className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
+            <button
+              onClick={handleSignOut}
+              className="text-sm text-gray-400 hover:text-white transition-colors duration-200"
+            >
               Sign Out
             </button>
           </div>
         </div>
       </header>
+
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {!followVerified ? (
           <FollowGate userFid={user.fid} onFollowVerified={() => setFollowVerified(true)} />
         ) : !permissionGranted ? (
-          <PermissionGate userFid={user.fid} onPermissionGranted={(signerUuid) => { setUser({ ...user, signer_uuid: signerUuid }); setPermissionGranted(true); }} />
+          <PermissionGate 
+            userFid={user.fid} 
+            onPermissionGranted={(signerUuid) => {
+              setUser({ ...user, signer_uuid: signerUuid });
+              setPermissionGranted(true);
+            }} 
+          />
         ) : (
           <>
             <NonFollowersList userFid={user.fid} signerUuid={user.signer_uuid!} />
