@@ -1,9 +1,4 @@
 {
-  "accountAssociation": {
-    "header": "",
-    "payload": "",
-    "signature": ""
-  },
   "frame": {
     "version": "0.0.0",
     "name": "Unfollow Cleaner",
