@@ -30,7 +30,6 @@ export default function PermissionGate({ userFid, onPermissionGranted }: Permiss
     };
 
     const interval = setInterval(checkSigner, 2000);
-
     return () => clearInterval(interval);
   }, [signerUuid, onPermissionGranted]);
 
@@ -51,7 +50,6 @@ export default function PermissionGate({ userFid, onPermissionGranted }: Permiss
 
       setSignerUuid(data.signer_uuid);
       setApprovalUrl(data.deep_link);
-      
       window.open(data.deep_link, '_blank');
     } catch (error: any) {
       setError(error.message || 'Failed to create permission request');
@@ -73,11 +71,7 @@ export default function PermissionGate({ userFid, onPermissionGranted }: Permiss
             <p className="text-gray-400 text-lg mb-4">
               Please approve the permission request in Warpcast
             </p>
-            <p className="text-sm text-gray-500">
-              This will allow the app to unfollow users on your behalf
-            </p>
           </div>
-
           
             href={approvalUrl}
             target="_blank"
@@ -104,21 +98,16 @@ export default function PermissionGate({ userFid, onPermissionGranted }: Permiss
           <p className="text-gray-400 text-lg mb-4">
             To unfollow users, this app needs your permission
           </p>
-          <p className="text-sm text-gray-500">
-            You'll be redirected to Warpcast to approve
-          </p>
         </div>
-
         {error && (
           <div className="bg-red-900/50 border border-red-700 text-red-200 px-4 py-3 rounded-lg mb-6">
             {error}
           </div>
         )}
-
         <button
           onClick={handleGrantPermission}
           disabled={isGranting}
-          className="bg-farcaster-purple hover:bg-purple-700 disabled:bg-gray-600 text-white font-bold py-4 px-8 rounded-lg transition-all duration-200 transform hover:scale-105"
+          className="bg-farcaster-purple hover:bg-purple-700 disabled:bg-gray-600 text-white font-bold py-4 px-8 rounded-lg transition-all duration-200"
         >
           {isGranting ? 'Creating request...' : 'Grant Permission'}
         </button>
