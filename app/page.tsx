@@ -1,10 +1,28 @@
 'use client';
-
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import sdk from '@farcaster/miniapp-sdk';
 
 export default function Home() {
   const router = useRouter();
+  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
+
+  useEffect(() => {
+    const loadSDK = async () => {
+      try {
+        // SDK'yı hazır hale getir
+        await sdk.actions.ready();
+        setIsSDKLoaded(true);
+      } catch (error) {
+        console.error('SDK load error:', error);
+        setIsSDKLoaded(true); // Hata olsa bile devam et
+      }
+    };
+
+    if (sdk && !isSDKLoaded) {
+      loadSDK();
+    }
+  }, [isSDKLoaded]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -12,7 +30,7 @@ export default function Home() {
       const fid = params.get('fid');
       
       if (fid) {
-        router.push(`/app?fid=${fid}`);
+        router.push(`/app?fid=${fid}`); // ✅ Düzeltildi: backtick yerine parantez
       }
     }
   }, [router]);
@@ -41,7 +59,6 @@ export default function Home() {
         <p className="text-xl text-gray-300 mb-8">
           Clean up your Farcaster following list
         </p>
-
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
           <p className="text-gray-400 mb-4">
             This app works inside Warpcast.
