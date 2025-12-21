@@ -13,6 +13,9 @@ declare global {
       context?: { user?: { fid: number } };
       Actions?: { ready: () => void };
     };
+    sdk?: {
+      actions?: { ready: () => void };
+    };
   }
 }
 
@@ -31,13 +34,24 @@ function AppContent() {
   const [permissionGranted, setPermissionGranted] = useState(false);
 
   useEffect(() => {
-    import('@farcaster/frame-sdk').then(({ sdk }) => {
-      sdk.actions.ready();
-    }).catch(() => {
-      if (typeof window !== 'undefined' && window.Farcaster?.Actions) {
-        window.Farcaster.Actions.ready();
+    let readyCalled = false;
+    
+    const callReady = () => {
+      if (readyCalled) return;
+      readyCalled = true;
+      
+      if (typeof window !== 'undefined') {
+        if ((window as any).sdk?.actions?.ready) {
+          (window as any).sdk.actions.ready();
+        } else if (window.Farcaster?.Actions?.ready) {
+          window.Farcaster.Actions.ready();
+        } else {
+          setTimeout(callReady, 100);
+        }
       }
-    });
+    };
+
+    callReady();
 
     const getFid = () => {
       const urlFid = searchParams.get('fid');
