@@ -1,0 +1,20 @@
+{
+  "accountAssociation": {
+    "header": "eyJmaWQiOjQyOTk3MywidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweGI3YkEyNTk3NjI0MTRFMjRGOTI0MTVFRjc4MDE5Y2RjM2FlM0M5ZEUifQ",
+    "payload": "eyJkb21haW4iOiJ1bmZvbGxvdy1jbGVhbmVyLnZlcmNlbC5hcHAifQ",
+    "signature": "PqaN7O2suobRJQs8X1dzrgIfw38dfdgD40O3AhdXX4JuhiAMtWS6vaqdyY3Gth9aJGc1SrbvGRV9acu0+BaLrRw="
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "Unfollow Cleaner",
+    "iconUrl": "https://unfollow-cleaner.vercel.app/api/icon",
+    "homeUrl": "https://unfollow-cleaner.vercel.app/app",
+    "splashImageUrl": "https://unfollow-cleaner.vercel.app/api/splash",
+    "splashBackgroundColor": "#8B5CF6",
+    "webhookUrl": "https://unfollow-cleaner.vercel.app/api/webhook",
+    "subtitle": "Clean up your following list",
+    "description": "Find who doesn't follow you back on Farcaster and unfollow them easily.",
+    "primaryCategory": "social",
+    "tags": ["social", "tools", "cleanup"]
+  }
+}
