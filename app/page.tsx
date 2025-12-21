@@ -1,38 +1,34 @@
 'use client';
-import { useEffect, useState } from 'react';
+
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import sdk from '@farcaster/miniapp-sdk';
 
 export default function Home() {
   const router = useRouter();
-  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
 
   useEffect(() => {
-    const loadSDK = async () => {
+    const initApp = async () => {
       try {
-        // SDK'yı hazır hale getir
+        const { sdk } = await import('@farcaster/miniapp-sdk');
         await sdk.actions.ready();
-        setIsSDKLoaded(true);
-      } catch (error) {
-        console.error('SDK load error:', error);
-        setIsSDKLoaded(true); // Hata olsa bile devam et
+        
+        const context = await sdk.context;
+        if (context?.user?.fid) {
+          router.push(`/app?fid=${context.user.fid}`);
+          return;
+        }
+      } catch (e) {
+        console.log('Not in mini app:', e);
+      }
+      
+      const params = new URLSearchParams(window.location.search);
+      const fid = params.get('fid');
+      if (fid) {
+        router.push(`/app?fid=${fid}`);
       }
     };
 
-    if (sdk && !isSDKLoaded) {
-      loadSDK();
-    }
-  }, [isSDKLoaded]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const fid = params.get('fid');
-      
-      if (fid) {
-        router.push(`/app?fid=${fid}`); // ✅ Düzeltildi: backtick yerine parantez
-      }
-    }
+    initApp();
   }, [router]);
 
   return (
@@ -59,6 +55,7 @@ export default function Home() {
         <p className="text-xl text-gray-300 mb-8">
           Clean up your Farcaster following list
         </p>
+
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
           <p className="text-gray-400 mb-4">
             This app works inside Warpcast.
