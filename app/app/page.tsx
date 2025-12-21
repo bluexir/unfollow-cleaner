@@ -31,17 +31,18 @@ function AppContent() {
   const [permissionGranted, setPermissionGranted] = useState(false);
 
   useEffect(() => {
-    // Signal to Farcaster that app is ready
-    if (typeof window !== 'undefined' && window.Farcaster?.Actions) {
-      window.Farcaster.Actions.ready();
-    }
+    import('@farcaster/frame-sdk').then(({ sdk }) => {
+      sdk.actions.ready();
+    }).catch(() => {
+      if (typeof window !== 'undefined' && window.Farcaster?.Actions) {
+        window.Farcaster.Actions.ready();
+      }
+    });
 
     const getFid = () => {
-      // First try URL parameter
       const urlFid = searchParams.get('fid');
       if (urlFid) return urlFid;
       
-      // Then try Farcaster context
       if (typeof window !== 'undefined' && window.Farcaster?.context?.user?.fid) {
         return window.Farcaster.context.user.fid.toString();
       }
