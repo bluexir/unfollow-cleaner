@@ -1,4 +1,22 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
 export default function Home() {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const fid = params.get('fid');
+      
+      if (fid) {
+        router.push(`/app?fid=${fid}`);
+      }
+    }
+  }, [router]);
+
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-farcaster-darker via-gray-900 to-black">
       <div className="text-center px-4 max-w-2xl">
