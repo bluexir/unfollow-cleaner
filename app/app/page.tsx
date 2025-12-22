@@ -44,7 +44,6 @@ function AppContent() {
         const context = await sdk.context;
         
         console.log('🔍 SDK Context:', context);
-        console.log('🔍 Context User:', context?.user);
         console.log('🔍 FID from context:', context?.user?.fid);
         
         const urlFid = searchParams.get('fid');
@@ -55,12 +54,14 @@ function AppContent() {
         
         if (fid) {
           console.log('🔍 Fetching user data for FID:', fid);
+          console.log('🔍 API Key:', process.env.NEXT_PUBLIC_NEYNAR_API_KEY);
+          
           const response = await fetch(
             `https://api.neynar.com/v2/farcaster/user/bulk?fids=${fid}`,
             {
               headers: {
                 'accept': 'application/json',
-                'api_key': process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID || '',
+                'api_key': process.env.NEXT_PUBLIC_NEYNAR_API_KEY || '',
               },
             }
           );
