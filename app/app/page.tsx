@@ -32,38 +32,43 @@ function AppContent() {
   const [user, setUser] = useState<FarcasterUser | null>(null);
   const [followVerified, setFollowVerified] = useState(false);
   const [permissionGranted, setPermissionGranted] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    import('@farcaster/miniapp-sdk').then(({ sdk }) => {
-      sdk.actions.ready();
-    }).catch(() => {
-      if (typeof window !== 'undefined' && window.Farcaster?.Actions?.ready) {
-        window.Farcaster.Actions.ready();
-      }
-    });
-
-    const getFid = () => {
-      const urlFid = searchParams.get('fid');
-      if (urlFid) return urlFid;
-      
-      if (typeof window !== 'undefined' && window.Farcaster?.context?.user?.fid) {
-        return window.Farcaster.context.user.fid.toString();
-      }
-      
-      return null;
-    };
-
-    const fid = getFid();
-    
-    if (fid) {
-      fetch(`https://api.neynar.com/v2/farcaster/user/bulk?fids=${fid}`, {
-        headers: {
-          'accept': 'application/json',
-          'api_key': process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID || '',
-        },
-      })
-        .then(res => res.json())
-        .then(data => {
+    const initApp = async () => {
+      try {
+        // SDK'yı import et ve initialize et
+        const { sdk } = await import('@farcaster/miniapp-sdk');
+        await sdk.actions.ready();
+        
+        // SDK context'ten FID al
+        const context = await sdk.context;
+        let fid = context?.user?.fid?.toString();
+        
+        // Eğer SDK'dan alamadıysak URL'den dene
+        if (!fid) {
+          fid = searchParams.get('fid');
+        }
+        
+        // Fallback: window.Farcaster
+        if (!fid && typeof window !== 'undefined' && window.Farcaster?.context?.user?.fid) {
+          fid = window.Farcaster.context.user.fid.toString();
+        }
+        
+        if (fid) {
+          // Kullanıcı bilgilerini çek
+          const response = await fetch(
+            `https://api.neynar.com/v2/farcaster/user/bulk?fids=${fid}`,
+            {
+              headers: {
+                'accept': 'application/json',
+                'api_key': process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID || '',
+              },
+            }
+          );
+          
+          const data = await response.json();
+          
           if (data.users && data.users[0]) {
             const userData = data.users[0];
             setUser({
@@ -73,11 +78,51 @@ function AppContent() {
               pfp_url: userData.pfp_url || '',
             });
           }
-        })
-        .catch(err => {
-          console.error('Error fetching user:', err);
-        });
-    }
+        }
+      } catch (err) {
+        console.error('Error initializing app:', err);
+        
+        // SDK hata verirse fallback yöntemi dene
+        try {
+          if (typeof window !== 'undefined' && window.Farcaster?.Actions?.ready) {
+            window.Farcaster.Actions.ready();
+          }
+          
+          const fid = searchParams.get('fid') || 
+                      window.Farcaster?.context?.user?.fid?.toString();
+          
+          if (fid) {
+            const response = await fetch(
+              `https://api.neynar.com/v2/farcaster/user/bulk?fids=${fid}`,
+              {
+                headers: {
+                  'accept': 'application/json',
+                  'api_key': process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID || '',
+                },
+              }
+            );
+            
+            const data = await response.json();
+            
+            if (data.users && data.users[0]) {
+              const userData = data.users[0];
+              setUser({
+                fid: parseInt(fid),
+                username: userData.username,
+                display_name: userData.display_name || userData.username,
+                pfp_url: userData.pfp_url || '',
+              });
+            }
+          }
+        } catch (fallbackErr) {
+          console.error('Fallback error:', fallbackErr);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initApp();
   }, [searchParams]);
 
   const handleSignOut = () => {
@@ -86,7 +131,7 @@ function AppContent() {
     setPermissionGranted(false);
   };
 
-  if (!user) {
+  if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-farcaster-darker">
         <div className="text-center">
