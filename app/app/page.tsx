@@ -22,29 +22,28 @@ function AppContent() {
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // 1️⃣ İLK İŞ: SDK ready() - Splash screen'i kaldır
   useEffect(() => {
-    const initApp = async () => {
+    const initSDK = async () => {
       try {
-        // SDK'yı import et
         const { sdk } = await import('@farcaster/miniapp-sdk');
-        
-        // SDK context'i await ile al (Promise!)
+        await sdk.actions.ready();
+      } catch (e) {
+        console.error('SDK init error:', e);
+      }
+    };
+    initSDK();
+  }, []);
+
+  // 2️⃣ SONRA: User bilgisini al
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const { sdk } = await import('@farcaster/miniapp-sdk');
         const context = await sdk.context;
-        
-        // FID'yi context'ten al
-        let fid: string | null = null;
-        
-        if (context?.user?.fid) {
-          fid = context.user.fid.toString();
-        }
-        
-        // Eğer SDK'dan alamadıysak URL'den dene
-        if (!fid) {
-          fid = searchParams.get('fid');
-        }
+        const fid = context?.user?.fid?.toString() || searchParams.get('fid');
         
         if (fid) {
-          // Kullanıcı bilgilerini Neynar'dan çek
           const response = await fetch(
             `https://api.neynar.com/v2/farcaster/user/bulk?fids=${fid}`,
             {
@@ -67,49 +66,14 @@ function AppContent() {
             });
           }
         }
-        
-        // Splash screen'i kapat - EN SONDA!
-        await sdk.actions.ready();
-        
       } catch (err) {
-        console.error('Error initializing app:', err);
-        
-        // SDK yüklenemezse fallback: URL'den FID al
-        const urlFid = searchParams.get('fid');
-        
-        if (urlFid) {
-          try {
-            const response = await fetch(
-              `https://api.neynar.com/v2/farcaster/user/bulk?fids=${urlFid}`,
-              {
-                headers: {
-                  'accept': 'application/json',
-                  'api_key': process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID || '',
-                },
-              }
-            );
-            
-            const data = await response.json();
-            
-            if (data.users && data.users[0]) {
-              const userData = data.users[0];
-              setUser({
-                fid: parseInt(urlFid),
-                username: userData.username,
-                display_name: userData.display_name || userData.username,
-                pfp_url: userData.pfp_url || '',
-              });
-            }
-          } catch (fallbackErr) {
-            console.error('Fallback error:', fallbackErr);
-          }
-        }
+        console.error('User fetch error:', err);
       } finally {
         setLoading(false);
       }
     };
 
-    initApp();
+    fetchUser();
   }, [searchParams]);
 
   const handleSignOut = () => {
@@ -123,7 +87,7 @@ function AppContent() {
       <div className="min-h-screen flex items-center justify-center bg-farcaster-darker">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-farcaster-purple mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading...</p>
+          <p className="text-gray-400">Loading user data...</p>
         </div>
       </div>
     );
