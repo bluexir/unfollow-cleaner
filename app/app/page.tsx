@@ -22,28 +22,39 @@ function AppContent() {
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // 1️⃣ İLK İŞ: SDK ready() - Splash screen'i kaldır
   useEffect(() => {
     const initSDK = async () => {
       try {
+        console.log('🚀 Starting SDK init...');
         const { sdk } = await import('@farcaster/miniapp-sdk');
         await sdk.actions.ready();
+        console.log('✅ SDK ready() called successfully');
       } catch (e) {
-        console.error('SDK init error:', e);
+        console.error('❌ SDK init error:', e);
       }
     };
     initSDK();
   }, []);
 
-  // 2️⃣ SONRA: User bilgisini al
   useEffect(() => {
     const fetchUser = async () => {
       try {
+        console.log('🔍 Starting user fetch...');
         const { sdk } = await import('@farcaster/miniapp-sdk');
         const context = await sdk.context;
-        const fid = context?.user?.fid?.toString() || searchParams.get('fid');
+        
+        console.log('🔍 SDK Context:', context);
+        console.log('🔍 Context User:', context?.user);
+        console.log('🔍 FID from context:', context?.user?.fid);
+        
+        const urlFid = searchParams.get('fid');
+        console.log('🔍 FID from URL:', urlFid);
+        
+        const fid = context?.user?.fid?.toString() || urlFid;
+        console.log('🔍 Final FID:', fid);
         
         if (fid) {
+          console.log('🔍 Fetching user data for FID:', fid);
           const response = await fetch(
             `https://api.neynar.com/v2/farcaster/user/bulk?fids=${fid}`,
             {
@@ -54,21 +65,29 @@ function AppContent() {
             }
           );
           
+          console.log('🔍 API Response status:', response.status);
           const data = await response.json();
+          console.log('🔍 API Response data:', data);
           
           if (data.users && data.users[0]) {
             const userData = data.users[0];
+            console.log('✅ User data found:', userData);
             setUser({
               fid: parseInt(fid),
               username: userData.username,
               display_name: userData.display_name || userData.username,
               pfp_url: userData.pfp_url || '',
             });
+          } else {
+            console.error('❌ No user data in response');
           }
+        } else {
+          console.error('❌ NO FID FOUND!');
         }
       } catch (err) {
-        console.error('User fetch error:', err);
+        console.error('❌ User fetch error:', err);
       } finally {
+        console.log('🏁 Setting loading to false');
         setLoading(false);
       }
     };
