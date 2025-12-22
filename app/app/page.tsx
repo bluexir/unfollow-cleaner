@@ -7,18 +7,6 @@ import PermissionGate from '@/components/PermissionGate';
 import NonFollowersList from '@/components/NonFollowersList';
 import TipSection from '@/components/TipSection';
 
-declare global {
-  interface Window {
-    Farcaster?: {
-      context?: { user?: { fid: number } };
-      Actions?: { ready: () => void };
-    };
-    sdk?: {
-      actions?: { ready: () => void };
-    };
-  }
-}
-
 interface FarcasterUser {
   fid: number;
   username: string;
@@ -37,26 +25,24 @@ function AppContent() {
   useEffect(() => {
     const initApp = async () => {
       try {
-        // SDK'yı import et ve initialize et
+        // SDK'yı import et ve ready() çağır
         const { sdk } = await import('@farcaster/miniapp-sdk');
         await sdk.actions.ready();
         
-        // SDK context'ten FID al
-        const context = await sdk.context;
-        let fid = context?.user?.fid?.toString();
+        // SDK context'ten FID al (context direkt erişilebilir bir obje)
+        let fid: string | null = null;
+        
+        if (sdk.context?.user?.fid) {
+          fid = sdk.context.user.fid.toString();
+        }
         
         // Eğer SDK'dan alamadıysak URL'den dene
         if (!fid) {
           fid = searchParams.get('fid');
         }
         
-        // Fallback: window.Farcaster
-        if (!fid && typeof window !== 'undefined' && window.Farcaster?.context?.user?.fid) {
-          fid = window.Farcaster.context.user.fid.toString();
-        }
-        
         if (fid) {
-          // Kullanıcı bilgilerini çek
+          // Kullanıcı bilgilerini Neynar'dan çek
           const response = await fetch(
             `https://api.neynar.com/v2/farcaster/user/bulk?fids=${fid}`,
             {
@@ -82,18 +68,13 @@ function AppContent() {
       } catch (err) {
         console.error('Error initializing app:', err);
         
-        // SDK hata verirse fallback yöntemi dene
-        try {
-          if (typeof window !== 'undefined' && window.Farcaster?.Actions?.ready) {
-            window.Farcaster.Actions.ready();
-          }
-          
-          const fid = searchParams.get('fid') || 
-                      window.Farcaster?.context?.user?.fid?.toString();
-          
-          if (fid) {
+        // SDK yüklenemezse fallback: URL'den FID al
+        const urlFid = searchParams.get('fid');
+        
+        if (urlFid) {
+          try {
             const response = await fetch(
-              `https://api.neynar.com/v2/farcaster/user/bulk?fids=${fid}`,
+              `https://api.neynar.com/v2/farcaster/user/bulk?fids=${urlFid}`,
               {
                 headers: {
                   'accept': 'application/json',
@@ -107,15 +88,15 @@ function AppContent() {
             if (data.users && data.users[0]) {
               const userData = data.users[0];
               setUser({
-                fid: parseInt(fid),
+                fid: parseInt(urlFid),
                 username: userData.username,
                 display_name: userData.display_name || userData.username,
                 pfp_url: userData.pfp_url || '',
               });
             }
+          } catch (fallbackErr) {
+            console.error('Fallback error:', fallbackErr);
           }
-        } catch (fallbackErr) {
-          console.error('Fallback error:', fallbackErr);
         }
       } finally {
         setLoading(false);
