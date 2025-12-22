@@ -25,15 +25,17 @@ function AppContent() {
   useEffect(() => {
     const initApp = async () => {
       try {
-        // SDK'yı import et ve ready() çağır
+        // SDK'yı import et
         const { sdk } = await import('@farcaster/miniapp-sdk');
-        await sdk.actions.ready();
         
-        // SDK context'ten FID al (context direkt erişilebilir bir obje)
+        // SDK context'i await ile al (Promise!)
+        const context = await sdk.context;
+        
+        // FID'yi context'ten al
         let fid: string | null = null;
         
-        if (sdk.context?.user?.fid) {
-          fid = sdk.context.user.fid.toString();
+        if (context?.user?.fid) {
+          fid = context.user.fid.toString();
         }
         
         // Eğer SDK'dan alamadıysak URL'den dene
@@ -65,6 +67,10 @@ function AppContent() {
             });
           }
         }
+        
+        // Splash screen'i kapat - EN SONDA!
+        await sdk.actions.ready();
+        
       } catch (err) {
         console.error('Error initializing app:', err);
         
