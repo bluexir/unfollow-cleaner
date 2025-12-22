@@ -40,9 +40,9 @@ export default function PermissionGate({ userFid, onPermissionGranted }: Permiss
 
       setSignerData(data);
       
-      if (data.deep_link_url) {
-        console.log('🔗 Opening approval URL:', data.deep_link_url);
-        window.open(data.deep_link_url, '_blank');
+      if (data.deep_link) {
+        console.log('🔗 Opening approval URL:', data.deep_link);
+        window.open(data.deep_link, '_blank');
         startPolling(data.signer_uuid);
       }
     } catch (err) {
