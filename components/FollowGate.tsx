@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface FollowGateProps {
   userFid: number;
@@ -8,70 +8,66 @@ interface FollowGateProps {
 }
 
 export default function FollowGate({ userFid, onFollowVerified }: FollowGateProps) {
-  const [isChecking, setIsChecking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isFollowing, setIsFollowing] = useState<boolean | null>(null);
+  const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
     const checkFollow = async () => {
+      // BYPASS: Senin FID'in
+      if (userFid === 429973) {
+        onFollowVerified();
+        return;
+      }
+
       try {
         const response = await fetch(`/api/check-follow?fid=${userFid}`);
         const data = await response.json();
-
-        if (data.isFollowing || data.isBluexir) {
+        
+        if (data.isFollowing) {
           onFollowVerified();
+        } else {
+          setIsFollowing(false);
         }
       } catch (error) {
         console.error('Follow check error:', error);
+        setIsFollowing(false);
+      } finally {
+        setIsChecking(false);
       }
     };
 
-    setIsChecking(true);
     checkFollow();
-
-    const interval = setInterval(checkFollow, 3000);
-
-    return () => clearInterval(interval);
   }, [userFid, onFollowVerified]);
 
-  const handleFollowClick = () => {
-    window.open('https://warpcast.com/bluexir', '_blank');
-  };
+  if (isChecking) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-farcaster-purple"></div>
+      </div>
+    );
+  }
 
-  return (
-    <div className="max-w-2xl mx-auto text-center py-12">
-      <div className="bg-gradient-to-br from-farcaster-purple/20 to-purple-900/20 border border-farcaster-purple/30 rounded-2xl p-8 backdrop-blur-sm">
-        <div className="mb-6">
-          <div className="w-20 h-20 bg-farcaster-purple/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-10 h-10 text-farcaster-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          </div>
-          <h2 className="text-3xl font-bold mb-3">Follow Required</h2>
-          <p className="text-gray-400 text-lg">
-            To use Unfollow Cleaner, please follow @bluexir
-          </p>
-        </div>
-
-        {error && (
-          <div className="bg-red-900/50 border border-red-700 text-red-200 px-4 py-3 rounded-lg mb-6">
-            {error}
-          </div>
-        )}
-
-        <button
-          onClick={handleFollowClick}
-          disabled={isChecking}
-          className="bg-farcaster-purple hover:bg-purple-700 disabled:bg-gray-600 text-white font-bold py-4 px-8 rounded-lg transition-all duration-200 transform hover:scale-105"
+  if (isFollowing === false) {
+    return (
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center">
+        <svg className="w-16 h-16 text-farcaster-purple mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+        </svg>
+        <h2 className="text-2xl font-bold mb-2">Follow Required</h2>
+        <p className="text-gray-400 mb-6">
+          To use this app, please follow @bluexir on Farcaster
+        </p>
+        
+          href="https://warpcast.com/bluexir"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block bg-farcaster-purple hover:bg-purple-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors duration-200"
         >
           Follow @bluexir
-        </button>
-
-        {isChecking && (
-          <p className="text-sm text-gray-500 mt-4">
-            Checking follow status...
-          </p>
-        )}
+        </a>
       </div>
-    </div>
-  );
+    );
+  }
+
+  return null;
 }
