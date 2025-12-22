@@ -13,16 +13,11 @@ const nextConfig = {
             key: 'Access-Control-Allow-Origin',
             value: '*',
           },
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=0, must-revalidate',
+          },
         ],
-      },
-    ];
-  },
-  async redirects() {
-    return [
-      {
-        source: '/.well-known/farcaster.json',
-        destination: 'https://api.farcaster.xyz/miniapps/hosted-manifest/019b41c4-62be-077b-360f-3baf92b46005',
-        permanent: false,
       },
     ];
   },
