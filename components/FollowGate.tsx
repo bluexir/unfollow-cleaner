@@ -13,7 +13,6 @@ export default function FollowGate({ userFid, onFollowVerified }: FollowGateProp
 
   useEffect(() => {
     const checkFollow = async () => {
-      // BYPASS: Senin FID'in
       if (userFid === 429973) {
         onFollowVerified();
         return;
