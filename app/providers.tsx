@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, createContext, useContext } from "react";
-import sdk from "@farcaster/frame-sdk";
+import sdk from "@farcaster/frame-sdk"; // Doğru SDK ismi budur
 
 type FrameContext = Awaited<typeof sdk.context>;
 
@@ -15,11 +15,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const init = async () => {
       try {
-        // SDK Context verisini çek
         const frameContext = await sdk.context;
         setContext(frameContext);
         
-        // KRİTİK NOKTA: Context geldikten hemen sonra Ready sinyalini gönder
+        // Yükleme ekranını kapat
         sdk.actions.ready();
       } catch (error) {
         console.error("SDK Error:", error);
