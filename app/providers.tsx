@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, createContext, useContext, useState } from "react";
-import sdk, { type FrameContext } from "@farcaster/frame-sdk";
+import sdk from "@farcaster/frame-sdk";
+
+/**
+ * KUSURSUZ ÇÖZÜM:
+ * 'FrameContext' ismini import etmek yerine, SDK'nın kendisinden tipi türetiyoruz.
+ * Bu yöntem, "Exported member not found" hatasını %100 çözer.
+ */
+type FrameContext = Awaited<typeof sdk.context>;
 
 const FarcasterContext = createContext<{ context: FrameContext | undefined }>({ context: undefined });
 
@@ -10,12 +17,16 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const init = async () => {
-      // SDK'yı yükle ve kullanıcı bilgisini al
-      const frameContext = await sdk.context;
-      setContext(frameContext);
-      
-      // Warpcast'e uygulamanın hazır olduğunu bildir (Zorunlu)
-      sdk.actions.ready();
+      try {
+        // Context'i yükle
+        const frameContext = await sdk.context;
+        setContext(frameContext);
+        
+        // Uygulamanın hazır olduğunu bildir
+        sdk.actions.ready();
+      } catch (error) {
+        console.error("Frame SDK başlatılamadı:", error);
+      }
     };
     init();
   }, []);
