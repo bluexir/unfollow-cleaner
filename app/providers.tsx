@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, createContext, useContext } from "react";
-import sdk from "@farcaster/frame-sdk"; // Doğru SDK ismi budur
+import sdk from "@farcaster/frame-sdk";
 
 type FrameContext = Awaited<typeof sdk.context>;
 
@@ -15,17 +15,23 @@ export function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const init = async () => {
       try {
+        // SDK'nın hazır olmasını bekle
         const frameContext = await sdk.context;
         setContext(frameContext);
         
-        // Yükleme ekranını kapat
+        // KRİTİK HAMLE: Yükleme bitti, hemen sinyal gönder!
+        // Bu komut o "Ready not called" hatasını siler.
         sdk.actions.ready();
+        
       } catch (error) {
-        console.error("SDK Error:", error);
+        console.error("SDK Yükleme Hatası:", error);
       }
     };
 
-    init();
+    // Tarayıcı ortamındaysak başlat
+    if (typeof window !== "undefined") {
+      init();
+    }
   }, []);
 
   return (
