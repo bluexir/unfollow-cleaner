@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import sdk from "@farcaster/frame-sdk";
-import { REQUIRED_FOLLOW_FID } from "@/lib/neynar"; // Senin FID numaranı buradan alıyoruz
+import { REQUIRED_FOLLOW_FID } from "@/lib/neynar"; 
 
 interface User {
   fid: number;
@@ -37,7 +37,7 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
       const data = await res.json();
       setNonFollowers(data.users || []);
       setStats(data.stats || null);
-      setIsFollowingDev(data.isFollowingDev); // API'den gelen kilit durumu
+      setIsFollowingDev(data.isFollowingDev); 
     } catch (error) {
       console.error("Error fetching data", error);
     } finally {
@@ -106,7 +106,6 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
     }
   };
 
-  // Yükleme Ekranı
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
@@ -119,7 +118,7 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
   return (
     <div className="min-h-screen pb-12 px-4 pt-6 max-w-md mx-auto relative">
       
-      {/* İstatistik Kartı (HER ZAMAN AÇIK) */}
+      {/* İstatistik Kartı */}
       <div className="bg-[#1c1f2e]/80 backdrop-blur-md rounded-2xl p-6 mb-8 border border-white/5 shadow-2xl relative z-10">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-white bg-clip-text text-transparent">
@@ -146,7 +145,7 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
         </div>
       </div>
 
-      {/* Liste Bölümü */}
+      {/* Liste ve KİLİT Bölümü */}
       <div className="mb-10 relative">
         <h3 className="text-sm font-bold text-gray-400 mb-4 flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-red-500"></span>
@@ -156,7 +155,7 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
         {/* --- KİLİT MEKANİZMASI --- */}
         {!isFollowingDev && nonFollowers.length > 0 ? (
           <div className="relative">
-            {/* Sansürlü (Blur) Liste Örneği */}
+            {/* Sansürlü (Blur) Liste */}
             <div className="space-y-3 filter blur-md select-none opacity-50 pointer-events-none">
               {nonFollowers.slice(0, 4).map((u) => (
                 <div key={u.fid} className="flex items-center justify-between bg-[#151722] p-3 rounded-xl border border-white/5">
@@ -172,13 +171,13 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
               ))}
             </div>
 
-            {/* Kilit Overlay (Üst Katman) */}
+            {/* Kilit Overlay */}
             <div className="absolute inset-0 flex flex-col items-center justify-center z-20 top-[-20px]">
               <div className="bg-[#1c1f2e] border border-purple-500/30 p-6 rounded-2xl shadow-2xl text-center max-w-[90%]">
                 <div className="text-4xl mb-3">🔒</div>
                 <h3 className="text-white font-bold text-lg mb-2">Access Restricted</h3>
                 <p className="text-gray-400 text-sm mb-4">
-                  Follow the developer <span className="text-purple-400 font-bold">@bluexir</span> to unlock the full list and start cleaning.
+                  Follow <span className="text-purple-400 font-bold">@bluexir</span> to unlock the list and start cleaning.
                 </p>
                 <div className="flex flex-col gap-3">
                     <button 
@@ -230,7 +229,7 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
         )}
       </div>
 
-      {/* Smart Tip System */}
+      {/* Akıllı Bahşiş Sistemi */}
       <div className="bg-gradient-to-b from-[#252836] to-[#1c1f2e] rounded-2xl p-1 border border-white/10 shadow-lg mt-8">
         <div className="grid grid-cols-3 gap-1 mb-4 bg-black/20 p-1 rounded-xl">
           {(["ETH", "DEGEN", "USDC"] as const).map((curr) => (
