@@ -1,47 +1,36 @@
-export const dynamic = 'force-dynamic';
+import { NextRequest, NextResponse } from "next/server";
 
-import { NextRequest, NextResponse } from 'next/server';
-import { neynarClient } from '@/lib/neynar';
+const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY;
+const TARGET_FID = 429973; // Senin FID numaran
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const fid = searchParams.get("fid");
+
+  if (!fid) {
+    return NextResponse.json({ error: "FID gerekli" }, { status: 400 });
+  }
+
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const fid = searchParams.get('fid');
-
-    if (!fid) {
-      return NextResponse.json(
-        { error: 'FID is required' },
-        { status: 400 }
-      );
-    }
-
-    const bluexirUser = await neynarClient.lookupUserByUsername('bluexir');
-    const bluexirFid = bluexirUser.result.user.fid;
-
-    if (parseInt(fid) === bluexirFid) {
-      return NextResponse.json({
-        isFollowing: true,
-        isBluexir: true,
-      });
-    }
-
-    const followersResponse = await neynarClient.fetchUserFollowers(bluexirFid, {
-      limit: 100,
-    });
-
-    const isFollowing = followersResponse.result.users.some(
-      (user) => user.fid === parseInt(fid)
+    // Neynar API üzerinden takip kontrolü
+    const response = await fetch(
+      `https://api.neynar.com/v2/farcaster/user/bulk?fids=${fid}&viewer_fid=${TARGET_FID}`,
+      {
+        headers: {
+          api_key: NEYNAR_API_KEY || "",
+        },
+      }
     );
 
-    return NextResponse.json({
-      isFollowing,
-      isBluexir: false,
-    });
-  } catch (error: any) {
-    console.error('Check follow error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to check follow status' },
-      { status: 500 }
-    );
+    const data = await response.json();
+    
+    // Kullanıcı bilgisi içinde takip durumu kontrolü
+    const user = data.users?.[0];
+    const isFollowing = user?.viewer_context?.following || false;
+
+    return NextResponse.json({ isFollowing });
+  } catch (error) {
+    console.error("Takip kontrol hatası:", error);
+    return NextResponse.json({ isFollowing: false, error: "Sunucu hatası" }, { status: 500 });
   }
 }
