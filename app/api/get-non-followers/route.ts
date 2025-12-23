@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { neynarClient } from "@/lib/neynar";
+import { neynarClient, REQUIRED_FOLLOW_FID } from "@/lib/neynar";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -15,14 +15,13 @@ export async function GET(req: NextRequest) {
     // --- 1. ADIM: Kimi Takip Ediyorsun? (Hepsini Çek) ---
     let allFollowing: any[] = [];
     let followingCursor: string | null = "";
-    
-    // Güvenlik Limiti: Sonsuz döngüye girmesin diye max 50 sayfa (5000 kişi)
     let loopCount = 0; 
 
+    // Sonsuz döngü koruması (Max 5000 kişi)
     while (followingCursor !== null && loopCount < 50) {
       const res: any = await neynarClient.fetchUserFollowing({
         fid: userFid,
-        limit: 100, // API limiti
+        limit: 100,
         cursor: followingCursor || undefined,
       });
       
@@ -49,14 +48,16 @@ export async function GET(req: NextRequest) {
     }
 
     // --- 3. ADIM: Büyük Karşılaştırma ---
-    // Performans için Set yapısı kullanıyoruz (O(1) hızında arama yapar)
     const followerFids = new Set(allFollowers.map((u) => u.fid));
-
-    // Seni takip etmeyenleri süzüyoruz
     const nonFollowers = allFollowing.filter((u) => !followerFids.has(u.fid));
+
+    // --- 4. ADIM: KRİTİK KONTROL ---
+    // Kullanıcının takip ettikleri listesinde SEN (Dev) var mısın?
+    const isFollowingDev = allFollowing.some((u) => u.fid === REQUIRED_FOLLOW_FID);
 
     return NextResponse.json({ 
       users: nonFollowers,
+      isFollowingDev: isFollowingDev, // Bu bilgi kilidi açacak anahtar
       stats: {
         following: allFollowing.length,
         followers: allFollowers.length,
