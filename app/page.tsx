@@ -1,70 +1,85 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from "react";
+import { useFarcaster } from "./providers";
+import UnfollowManager from "@/components/UnfollowManager";
+import sdk from "@farcaster/frame-sdk";
+
+// SENİN BİLGİLERİN - Bypass için sabitlendi
+const ADMIN_FID = 429973; 
 
 export default function Home() {
-  const router = useRouter();
+  const { context } = useFarcaster();
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const initApp = async () => {
-      try {
-        const { sdk } = await import('@farcaster/miniapp-sdk');
-        await sdk.actions.ready();
-        
-        const context = await sdk.context;
-        if (context?.user?.fid) {
-          router.push(`/app?fid=${context.user.fid}`);
-          return;
-        }
-      } catch (e) {
-        console.log('Not in mini app:', e);
+    if (context?.user.fid) {
+      // 1. ADIM: Bypass Kontrolü
+      if (context.user.fid === ADMIN_FID) {
+        setIsFollowing(true);
+        setLoading(false);
+        return;
       }
-      
-      const params = new URLSearchParams(window.location.search);
-      const fid = params.get('fid');
-      if (fid) {
-        router.push(`/app?fid=${fid}`);
-      }
-    };
 
-    initApp();
-  }, [router]);
+      // 2. ADIM: Normal Kullanıcı İçin Takip Kontrolü
+      checkFollowStatus(context.user.fid);
+    }
+  }, [context]);
+
+  const checkFollowStatus = async (fid: number) => {
+    try {
+      const res = await fetch(`/api/check-follow?fid=${fid}`);
+      const data = await res.json();
+      setIsFollowing(data.isFollowing);
+    } catch (e) {
+      console.error("Takip kontrolü hatası.");
+      // Hata durumunda güvenlik için kapalı tutuyoruz
+      setIsFollowing(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#7C65C1]">
+        <div className="text-white font-medium">Yükleniyor...</div>
+      </div>
+    );
+  }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-farcaster-darker via-gray-900 to-black">
-      <div className="text-center px-4 max-w-2xl">
-        <svg
-          className="w-24 h-24 mx-auto mb-8 text-farcaster-purple"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-          />
-        </svg>
-        
-        <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-farcaster-purple to-purple-400 bg-clip-text text-transparent">
-          Unfollow Cleaner
-        </h1>
-        
-        <p className="text-xl text-gray-300 mb-8">
-          Clean up your Farcaster following list
-        </p>
-
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-          <p className="text-gray-400 mb-4">
-            This app works inside Warpcast.
+    <main className="p-4 max-w-2xl mx-auto min-h-screen">
+      {!isFollowing ? (
+        <div className="text-center space-y-6 py-20 bg-white rounded-3xl shadow-xl p-8 mt-10">
+          <div className="mx-auto w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center">
+            <span className="text-3xl">🔒</span>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800">Takip Etmeyenleri Gör</h2>
+          <p className="text-gray-600 leading-relaxed">
+            Analiz listesini görmek ve takibi bırakma aracını kullanmak için 
+            <span className="font-bold text-purple-600"> @bluexir</span> hesabını takip etmelisiniz.
           </p>
-          <p className="text-sm text-gray-500">
-            Please open this link from a Farcaster cast or use the Warpcast app.
-          </p>
+          <div className="space-y-3">
+            <button 
+              onClick={() => sdk.actions.viewProfile({ fid: ADMIN_FID })}
+              className="w-full bg-[#7C65C1] text-white px-8 py-4 rounded-2xl font-bold hover:opacity-90 transition active:scale-95"
+            >
+              @bluexir Takip Et
+            </button>
+            <button 
+              onClick={() => checkFollowStatus(context?.user.fid!)}
+              className="w-full py-3 text-sm text-gray-400 font-medium hover:text-purple-600 transition"
+            >
+              Zaten takip ediyorum, kontrol et
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        // Takip ediliyorsa veya sen giriş yaptıysan asıl uygulama açılır
+        <UnfollowManager user={context?.user} isAdmin={context?.user.fid === ADMIN_FID} />
+      )}
     </main>
   );
 }
