@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import sdk from "@farcaster/frame-sdk";
-import { REQUIRED_FOLLOW_FID } from "@/lib/neynar"; 
+import { REQUIRED_FOLLOW_FID } from "@/lib/neynar";
 
 interface User {
   fid: number;
@@ -18,7 +18,7 @@ interface Stats {
 }
 
 // Configuration
-const WALLET_ADDR = "0xaDBd1712D5c6e2A4D7e08F50a9586d3C054E30c8";
+const WALLET_ADDR = "0xaDBd1712D5c6e2A4D7e08F50a9586d3C054E30c8"; // Senin cüzdanın
 const USDC_ADDR = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // Base USDC
 const DEGEN_ADDR = "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"; // Base DEGEN
 
@@ -26,20 +26,23 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
   const [nonFollowers, setNonFollowers] = useState<User[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(false);
-  const [isFollowingDev, setIsFollowingDev] = useState(false); // Takip durumu
+  const [isFollowingDev, setIsFollowingDev] = useState(false); // Takip durumu kilidi
   const [currency, setCurrency] = useState<"ETH" | "DEGEN" | "USDC">("ETH");
 
   const fetchData = useCallback(async () => {
     if (!user?.fid) return;
     setLoading(true);
     try {
+      // API hem listeyi hem de takip durumunu (isFollowingDev) döndürecek
       const res = await fetch(`/api/get-non-followers?fid=${user.fid}`);
       const data = await res.json();
+      
       setNonFollowers(data.users || []);
       setStats(data.stats || null);
       setIsFollowingDev(data.isFollowingDev); 
+      
     } catch (error) {
-      console.error("Error fetching data", error);
+      console.error("Veri çekme hatası:", error);
     } finally {
       setLoading(false);
     }
@@ -59,7 +62,7 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
         setNonFollowers((prev) => prev.filter((u) => u.fid !== targetFid));
       }
     } catch (error) {
-      console.error("Unfollow failed", error);
+      console.error("Unfollow işlemi başarısız:", error);
     }
   };
 
@@ -74,16 +77,20 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
         to: WALLET_ADDR,
         value: "0",
         data: "0x",
-        chainId: "eip155:8453", 
+        chainId: "eip155:8453", // Base Mainnet
       };
 
       if (currency === "ETH") {
+        // ETH Transferi (Wei dönüşümü)
         const wei = BigInt(amount * 1000000000000000000).toString();
         txData.value = wei;
       } else {
+        // ERC20 Transferi (USDC veya DEGEN)
         const contract = currency === "USDC" ? USDC_ADDR : DEGEN_ADDR;
         const decimals = currency === "USDC" ? 6 : 18;
         const rawAmount = BigInt(amount * (10 ** decimals));
+        
+        // Transfer fonksiyonunu manuel encode ediyoruz (0xa9059cbb)
         const amountHex = rawAmount.toString(16).padStart(64, "0");
         const addressHex = WALLET_ADDR.replace("0x", "").padStart(64, "0");
         const data = `0xa9059cbb${addressHex}${amountHex}`;
@@ -94,7 +101,7 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
 
       await sdk.wallet.sendTransaction(txData);
     } catch (error) {
-      console.error("Transaction failed", error);
+      console.error("Transfer hatası:", error);
     }
   };
 
@@ -106,11 +113,12 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
     }
   };
 
+  // --- Yükleme Ekranı ---
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
         <div className="loader"></div>
-        <p className="text-purple-400 font-mono text-sm animate-pulse">SCANNING GHOSTS...</p>
+        <p className="text-purple-400 font-mono text-sm animate-pulse">GHOSTS SCANNING...</p>
       </div>
     );
   }
@@ -118,7 +126,7 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
   return (
     <div className="min-h-screen pb-12 px-4 pt-6 max-w-md mx-auto relative">
       
-      {/* İstatistik Kartı */}
+      {/* --- İstatistik Kartı (Her zaman açık) --- */}
       <div className="bg-[#1c1f2e]/80 backdrop-blur-md rounded-2xl p-6 mb-8 border border-white/5 shadow-2xl relative z-10">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-white bg-clip-text text-transparent">
@@ -145,17 +153,18 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
         </div>
       </div>
 
-      {/* Liste ve KİLİT Bölümü */}
+      {/* --- Liste ve KİLİT Bölümü --- */}
       <div className="mb-10 relative">
         <h3 className="text-sm font-bold text-gray-400 mb-4 flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-red-500"></span>
           DETECTED GHOSTS ({nonFollowers.length})
         </h3>
         
-        {/* --- KİLİT MEKANİZMASI --- */}
+        {/* === KİLİT MEKANİZMASI === */}
+        {/* Eğer seni takip etmiyorsa (isFollowingDev == false) VE listede hayalet varsa kilit devreye girer */}
         {!isFollowingDev && nonFollowers.length > 0 ? (
           <div className="relative">
-            {/* Sansürlü (Blur) Liste */}
+            {/* Sansürlü (Blur) Liste Arka Planı */}
             <div className="space-y-3 filter blur-md select-none opacity-50 pointer-events-none">
               {nonFollowers.slice(0, 4).map((u) => (
                 <div key={u.fid} className="flex items-center justify-between bg-[#151722] p-3 rounded-xl border border-white/5">
@@ -171,13 +180,13 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
               ))}
             </div>
 
-            {/* Kilit Overlay */}
+            {/* Kilit Overlay (Üst Katman) */}
             <div className="absolute inset-0 flex flex-col items-center justify-center z-20 top-[-20px]">
               <div className="bg-[#1c1f2e] border border-purple-500/30 p-6 rounded-2xl shadow-2xl text-center max-w-[90%]">
                 <div className="text-4xl mb-3">🔒</div>
                 <h3 className="text-white font-bold text-lg mb-2">Access Restricted</h3>
                 <p className="text-gray-400 text-sm mb-4">
-                  Follow <span className="text-purple-400 font-bold">@bluexir</span> to unlock the list and start cleaning.
+                  Follow the developer <span className="text-purple-400 font-bold">@bluexir</span> to unlock the full list and start cleaning.
                 </p>
                 <div className="flex flex-col gap-3">
                     <button 
@@ -197,7 +206,7 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
             </div>
           </div>
         ) : (
-          // --- KİLİT AÇIKSA LİSTEYİ GÖSTER ---
+          // === KİLİT AÇIKSA LİSTEYİ GÖSTER ===
           <>
             {nonFollowers.length === 0 ? (
               <div className="py-12 text-center border border-dashed border-white/10 rounded-2xl bg-white/5">
@@ -229,7 +238,7 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
         )}
       </div>
 
-      {/* Akıllı Bahşiş Sistemi */}
+      {/* --- Akıllı Bahşiş Sistemi --- */}
       <div className="bg-gradient-to-b from-[#252836] to-[#1c1f2e] rounded-2xl p-1 border border-white/10 shadow-lg mt-8">
         <div className="grid grid-cols-3 gap-1 mb-4 bg-black/20 p-1 rounded-xl">
           {(["ETH", "DEGEN", "USDC"] as const).map((curr) => (
