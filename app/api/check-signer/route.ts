@@ -10,7 +10,6 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Hata buradaydı: signerUuid doğrudan değil, obje içinde gönderilmeli
     const signer = await neynarClient.lookupSigner({ signerUuid });
 
     if (signer.status === 'approved' && signer.fid) {
