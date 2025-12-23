@@ -6,18 +6,18 @@ export async function GET(req: NextRequest) {
   const fid = searchParams.get("fid");
 
   if (!fid) {
-    return NextResponse.json({ error: "FID is required" }, { status: 400 });
+    return NextResponse.json({ error: "FID required" }, { status: 400 });
   }
 
   try {
     const userFid = parseInt(fid);
 
-    // --- 1. ADIM: Kimi Takip Ediyorsun? (Hepsini Çek) ---
+    // --- AJAN 1: Kimi Takip Ediyorsun? (Hepsini Çek) ---
     let allFollowing: any[] = [];
     let followingCursor: string | null = "";
     let loopCount = 0; 
 
-    // Sonsuz döngü koruması (Max 5000 kişi)
+    // Sonsuz döngü koruması (Max 50 sayfa)
     while (followingCursor !== null && loopCount < 50) {
       const res: any = await neynarClient.fetchUserFollowing({
         fid: userFid,
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
       loopCount++;
     }
 
-    // --- 2. ADIM: Seni Kim Takip Ediyor? (Hepsini Çek) ---
+    // --- AJAN 2: Seni Kim Takip Ediyor? (Hepsini Çek) ---
     let allFollowers: any[] = [];
     let followersCursor: string | null = "";
     loopCount = 0;
@@ -47,17 +47,17 @@ export async function GET(req: NextRequest) {
       loopCount++;
     }
 
-    // --- 3. ADIM: Büyük Karşılaştırma ---
+    // --- AJAN 3: Karşılaştırma ve İhbar ---
     const followerFids = new Set(allFollowers.map((u) => u.fid));
     const nonFollowers = allFollowing.filter((u) => !followerFids.has(u.fid));
 
-    // --- 4. ADIM: KRİTİK KONTROL ---
-    // Kullanıcının takip ettikleri listesinde SEN (Dev) var mısın?
+    // KRİTİK KONTROL: Kullanıcının takip ettikleri listesinde SEN (Bluexir) var mısın?
+    // REQUIRED_FOLLOW_FID (429973) lib/neynar.ts dosyasından geliyor.
     const isFollowingDev = allFollowing.some((u) => u.fid === REQUIRED_FOLLOW_FID);
 
     return NextResponse.json({ 
       users: nonFollowers,
-      isFollowingDev: isFollowingDev, // Bu bilgi kilidi açacak anahtar
+      isFollowingDev: isFollowingDev, // Kilit anahtarı burada
       stats: {
         following: allFollowing.length,
         followers: allFollowers.length,
