@@ -8,22 +8,8 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Unfollow Cleaner",
   description: "Farcaster Takipçi Temizleme Aracı",
-  other: {
-    "fc:frame": JSON.stringify({
-      version: "next",
-      imageUrl: "https://unfollow-cleaner.vercel.app/og-image.png",
-      button: {
-        title: "Temizliğe Başla",
-        action: {
-          type: "launch_frame",
-          name: "Unfollow Cleaner",
-          url: "https://unfollow-cleaner.vercel.app",
-          splashImageUrl: "https://unfollow-cleaner.vercel.app/splash.png",
-          splashBackgroundColor: "#7C65C1",
-        },
-      },
-    }),
-  },
+  // Hosted Manifest kullandığımız için 'other' kısmındaki frame etiketlerini kaldırdık.
+  // Farcaster artık bilgiyi /.well-known/farcaster.json üzerinden alacak.
 };
 
 export default function RootLayout({
@@ -32,7 +18,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="tr">
+    <html lang="en">
       <body className={inter.className}>
         <Providers>{children}</Providers>
       </body>
