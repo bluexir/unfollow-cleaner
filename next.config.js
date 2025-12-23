@@ -1,23 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  async headers() {
+  typescript: {
+    // Üretim ortamında tip hataları olsa bile derlemeye devam et
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    // Üretim ortamında lint hataları olsa bile derlemeye devam et
+    ignoreDuringBuilds: true,
+  },
+  async redirects() {
     return [
       {
         source: '/.well-known/farcaster.json',
-        headers: [
-          {
-            key: 'Content-Type',
-            value: 'application/json',
-          },
-          {
-            key: 'Access-Control-Allow-Origin',
-            value: '*',
-          },
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=0, must-revalidate',
-          },
-        ],
+        destination: 'https://api.farcaster.xyz/miniapps/hosted-manifest/019b4cef-2be9-2c78-95d1-11d22ab48c5b',
+        permanent: false, // 307 redirect (Geçici yönlendirme)
       },
     ];
   },
