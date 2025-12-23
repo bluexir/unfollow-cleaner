@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import sdk from "@farcaster/frame-sdk";
+import { REQUIRED_FOLLOW_FID } from "@/lib/neynar"; // Senin FID numaranı buradan alıyoruz
 
 interface User {
   fid: number;
@@ -25,6 +26,7 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
   const [nonFollowers, setNonFollowers] = useState<User[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isFollowingDev, setIsFollowingDev] = useState(false); // Takip durumu
   const [currency, setCurrency] = useState<"ETH" | "DEGEN" | "USDC">("ETH");
 
   const fetchData = useCallback(async () => {
@@ -35,6 +37,7 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
       const data = await res.json();
       setNonFollowers(data.users || []);
       setStats(data.stats || null);
+      setIsFollowingDev(data.isFollowingDev); // API'den gelen kilit durumu
     } catch (error) {
       console.error("Error fetching data", error);
     } finally {
@@ -54,11 +57,15 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
       });
       if (res.ok) {
         setNonFollowers((prev) => prev.filter((u) => u.fid !== targetFid));
-        sdk.actions.addFrame(); // Trigger UI update if needed
       }
     } catch (error) {
       console.error("Unfollow failed", error);
     }
+  };
+
+  const handleFollowDev = () => {
+    // Seni takip etmesi için profilini açtırıyoruz
+    sdk.actions.viewProfile({ fid: REQUIRED_FOLLOW_FID });
   };
 
   const handleTip = async (amount: number) => {
@@ -67,20 +74,16 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
         to: WALLET_ADDR,
         value: "0",
         data: "0x",
-        chainId: "eip155:8453", // Base Mainnet
+        chainId: "eip155:8453", 
       };
 
       if (currency === "ETH") {
-        // ETH Transfer (Wei conversion)
         const wei = BigInt(amount * 1000000000000000000).toString();
         txData.value = wei;
       } else {
-        // ERC20 Transfer (USDC or DEGEN)
         const contract = currency === "USDC" ? USDC_ADDR : DEGEN_ADDR;
         const decimals = currency === "USDC" ? 6 : 18;
         const rawAmount = BigInt(amount * (10 ** decimals));
-        
-        // Encode transfer(address,uint256) -> 0xa9059cbb
         const amountHex = rawAmount.toString(16).padStart(64, "0");
         const addressHex = WALLET_ADDR.replace("0x", "").padStart(64, "0");
         const data = `0xa9059cbb${addressHex}${amountHex}`;
@@ -90,7 +93,6 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
       }
 
       await sdk.wallet.sendTransaction(txData);
-      
     } catch (error) {
       console.error("Transaction failed", error);
     }
@@ -104,6 +106,7 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
     }
   };
 
+  // Yükleme Ekranı
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
@@ -114,9 +117,10 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
   }
 
   return (
-    <div className="min-h-screen pb-12 px-4 pt-6 max-w-md mx-auto">
-      {/* Stats Card */}
-      <div className="bg-[#1c1f2e]/80 backdrop-blur-md rounded-2xl p-6 mb-8 border border-white/5 shadow-2xl">
+    <div className="min-h-screen pb-12 px-4 pt-6 max-w-md mx-auto relative">
+      
+      {/* İstatistik Kartı (HER ZAMAN AÇIK) */}
+      <div className="bg-[#1c1f2e]/80 backdrop-blur-md rounded-2xl p-6 mb-8 border border-white/5 shadow-2xl relative z-10">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-white bg-clip-text text-transparent">
             ANALYSIS REPORT
@@ -142,44 +146,92 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
         </div>
       </div>
 
-      {/* Non-Followers List */}
-      <div className="mb-10">
+      {/* Liste Bölümü */}
+      <div className="mb-10 relative">
         <h3 className="text-sm font-bold text-gray-400 mb-4 flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-red-500"></span>
           DETECTED GHOSTS ({nonFollowers.length})
         </h3>
         
-        {nonFollowers.length === 0 ? (
-          <div className="py-12 text-center border border-dashed border-white/10 rounded-2xl bg-white/5">
-            <span className="text-4xl block mb-2">✨</span>
-            <p className="text-gray-400 text-sm">No ghosts found. You are clean!</p>
+        {/* --- KİLİT MEKANİZMASI --- */}
+        {!isFollowingDev && nonFollowers.length > 0 ? (
+          <div className="relative">
+            {/* Sansürlü (Blur) Liste Örneği */}
+            <div className="space-y-3 filter blur-md select-none opacity-50 pointer-events-none">
+              {nonFollowers.slice(0, 4).map((u) => (
+                <div key={u.fid} className="flex items-center justify-between bg-[#151722] p-3 rounded-xl border border-white/5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gray-700"></div>
+                    <div className="flex flex-col gap-1">
+                      <div className="h-3 w-24 bg-gray-700 rounded"></div>
+                      <div className="h-2 w-16 bg-gray-800 rounded"></div>
+                    </div>
+                  </div>
+                  <div className="h-8 w-20 bg-red-900/20 rounded-lg"></div>
+                </div>
+              ))}
+            </div>
+
+            {/* Kilit Overlay (Üst Katman) */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center z-20 top-[-20px]">
+              <div className="bg-[#1c1f2e] border border-purple-500/30 p-6 rounded-2xl shadow-2xl text-center max-w-[90%]">
+                <div className="text-4xl mb-3">🔒</div>
+                <h3 className="text-white font-bold text-lg mb-2">Access Restricted</h3>
+                <p className="text-gray-400 text-sm mb-4">
+                  Follow the developer <span className="text-purple-400 font-bold">@bluexir</span> to unlock the full list and start cleaning.
+                </p>
+                <div className="flex flex-col gap-3">
+                    <button 
+                    onClick={handleFollowDev}
+                    className="bg-[#7C65C1] hover:bg-[#6952a3] text-white py-3 px-6 rounded-xl font-bold shadow-lg shadow-purple-900/20 transition-all active:scale-95"
+                    >
+                    Follow @bluexir
+                    </button>
+                    <button 
+                    onClick={fetchData}
+                    className="text-xs text-gray-500 hover:text-white underline decoration-dashed"
+                    >
+                    I Followed, Refresh Page
+                    </button>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
-          <div className="space-y-3">
-            {nonFollowers.map((u) => (
-              <div key={u.fid} className="flex items-center justify-between bg-[#151722] p-3 rounded-xl border border-white/5">
-                <div className="flex items-center gap-3">
-                  <img src={u.pfp_url} alt={u.username} className="w-10 h-10 rounded-full bg-gray-800" />
-                  <div className="flex flex-col">
-                    <span className="font-bold text-sm text-gray-200">{u.display_name}</span>
-                    <span className="text-xs text-gray-500">@{u.username}</span>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleUnfollow(u.fid)}
-                  className="bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-red-500/20"
-                >
-                  Unfollow
-                </button>
+          // --- KİLİT AÇIKSA LİSTEYİ GÖSTER ---
+          <>
+            {nonFollowers.length === 0 ? (
+              <div className="py-12 text-center border border-dashed border-white/10 rounded-2xl bg-white/5">
+                <span className="text-4xl block mb-2">✨</span>
+                <p className="text-gray-400 text-sm">No ghosts found. You are clean!</p>
               </div>
-            ))}
-          </div>
+            ) : (
+              <div className="space-y-3">
+                {nonFollowers.map((u) => (
+                  <div key={u.fid} className="flex items-center justify-between bg-[#151722] p-3 rounded-xl border border-white/5">
+                    <div className="flex items-center gap-3">
+                      <img src={u.pfp_url} alt={u.username} className="w-10 h-10 rounded-full bg-gray-800 object-cover" />
+                      <div className="flex flex-col">
+                        <span className="font-bold text-sm text-gray-200">{u.display_name}</span>
+                        <span className="text-xs text-gray-500">@{u.username}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleUnfollow(u.fid)}
+                      className="bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-red-500/20"
+                    >
+                      Unfollow
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Smart Tip System */}
-      <div className="bg-gradient-to-b from-[#252836] to-[#1c1f2e] rounded-2xl p-1 border border-white/10 shadow-lg">
-        {/* Currency Tabs */}
+      <div className="bg-gradient-to-b from-[#252836] to-[#1c1f2e] rounded-2xl p-1 border border-white/10 shadow-lg mt-8">
         <div className="grid grid-cols-3 gap-1 mb-4 bg-black/20 p-1 rounded-xl">
           {(["ETH", "DEGEN", "USDC"] as const).map((curr) => (
             <button
