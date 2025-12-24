@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 // --- AYARLAR ---
 const REQUIRED_FOLLOW_FID = 429973; // Bluexir
-const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY;
 
-// Yardımcı Fonksiyon: Neynar'a Direkt İstek Atar
+// Test için API Anahtarını doğrudan buraya yazdık. 
+// Çalıştığını gördükten sonra Vercel ayarlarına geri dönebiliriz.
+const NEYNAR_API_KEY = "018A8963-2A8F-4ADD-92C7-C3CFD7C511D3";
+
+// Yardımcı Fonksiyon: Neynar'a Direkt İstek Atar (SDK Kullanmadan)
 async function fetchNeynar(endpoint: string, params: string) {
   const url = `https://api.neynar.com/v2/farcaster/${endpoint}?${params}`;
   
@@ -12,13 +15,14 @@ async function fetchNeynar(endpoint: string, params: string) {
     method: "GET",
     headers: {
       "accept": "application/json",
-      "api_key": NEYNAR_API_KEY || "",
+      "api_key": NEYNAR_API_KEY,
     },
     cache: "no-store", // Her zaman taze veri çek
   });
 
   if (!res.ok) {
     const errorBody = await res.text();
+    // Hatayı detaylı görelim
     throw new Error(`Neynar API Hatası (${res.status}): ${errorBody}`);
   }
 
@@ -31,11 +35,12 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const fid = searchParams.get("fid");
 
-  if (!fid) return NextResponse.json({ error: "FID gerekli" }, { status: 400 });
-  if (!NEYNAR_API_KEY) return NextResponse.json({ error: "API Key eksik" }, { status: 500 });
+  if (!fid) {
+    return NextResponse.json({ error: "FID gerekli" }, { status: 400 });
+  }
 
   try {
-    const userFid = fid; // String olarak kalabilir
+    const userFid = fid; 
 
     // 1. TAKİP ETTİKLERİNİ ÇEK (Following)
     console.log("📡 Takip edilenler çekiliyor...");
@@ -56,7 +61,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 2. SENİ TAKİP EDENLERİ ÇEK (Followers)
-    console.log(`📡 Seni takip edenler çekiliyor... (${allFollowing.length} kişi bulundu)`);
+    console.log(`📡 Seni takip edenler çekiliyor... (Şu an bulunan takip edilen: ${allFollowing.length})`);
     let allFollowers: any[] = [];
     cursor = "";
     loop = 0;
@@ -74,7 +79,6 @@ export async function GET(req: NextRequest) {
 
     // 3. KARŞILAŞTIRMA
     console.log("⚡ Analiz yapılıyor...");
-    // Sadece FID'leri bir Set içinde topluyoruz (Hız için)
     const followerFids = new Set(allFollowers.map((u: any) => u.fid));
     
     // Takip ettiklerinden, seni takip etmeyenleri süzüyoruz
