@@ -2,28 +2,36 @@ import { NextRequest, NextResponse } from "next/server";
 
 // --- AYARLAR ---
 const REQUIRED_FOLLOW_FID = 429973; 
-// Senin verdiğin yeni anahtar
+// Senin verdiğin çalışan anahtar
 const NEYNAR_API_KEY = "9AE8AC85-3A93-4D79-ABAF-7AB279758724";
 
 export async function GET(req: NextRequest) {
+  // 1. FID KONTROLÜ
   const { searchParams } = new URL(req.url);
   const fid = searchParams.get("fid");
 
-  if (!fid) return NextResponse.json({ error: "FID gerekli" }, { status: 400 });
+  if (!fid) {
+    console.error("❌ HATA: FID parametresi URL'de yok!");
+    return NextResponse.json({ error: "FID gerekli" }, { status: 400 });
+  }
 
-  console.log(`🚀 Analiz Başlıyor: FID ${fid}`);
+  console.log(`🚀 API BAŞLATILDI. Hedef FID: ${fid}`);
 
   try {
-    // --- 1. TAKİP ETTİKLERİNİ ÇEK (Following) ---
-    let allFollowing = new Map();
+    // --- TAKİP ETTİKLERİNİ (FOLLOWING) ÇEK ---
+    let allFollowing: any[] = [];
     let cursor: string | null = "";
-    let loop = 0;
+    let pageCount = 0;
 
-    while (loop < 20) { // Cursor null olana kadar veya 20 sayfa
+    console.log("📡 'Following' listesi çekiliyor...");
+
+    while (pageCount < 30) { // Sonsuz döngü koruması
       const params = new URLSearchParams({
         fid: fid,
-        limit: "100", // String olarak '100'
+        viewer_fid: fid, // Neynar v2 bazen bunu ister
+        limit: "100",
       });
+      
       if (cursor) params.append("cursor", cursor);
 
       const url = `https://api.neynar.com/v2/farcaster/following?${params.toString()}`;
@@ -37,33 +45,40 @@ export async function GET(req: NextRequest) {
       });
 
       if (!res.ok) {
-        const err = await res.text();
-        console.error("Neynar API Hatası:", err);
-        break; 
+        const errText = await res.text();
+        console.error(`🔴 NEYNAR HATASI (Following): ${res.status} - ${errText}`);
+        break;
       }
 
       const data = await res.json();
       const users = data.users || [];
       
-      users.forEach((u: any) => allFollowing.set(u.fid, u));
-      
-      console.log(`   -> Following Sayfa ${loop + 1}: ${users.length} kişi geldi.`);
+      allFollowing = [...allFollowing, ...users];
+      console.log(`   📄 Sayfa ${pageCount + 1}: ${users.length} kişi çekildi. (Toplam: ${allFollowing.length})`);
 
+      // Cursor kontrolü (Devamı var mı?)
       cursor = data.next?.cursor || null;
-      if (!cursor) break; // Cursor bittiyse çık
-      loop++;
+      if (!cursor) {
+        console.log("   ✅ 'Following' listesi bitti.");
+        break;
+      }
+      pageCount++;
     }
 
-    // --- 2. SENİ TAKİP EDENLERİ ÇEK (Followers) ---
-    let allFollowers = new Map();
+    // --- SENİ TAKİP EDENLERİ (FOLLOWERS) ÇEK ---
+    let allFollowers: any[] = [];
     cursor = "";
-    loop = 0;
+    pageCount = 0;
 
-    while (loop < 20) {
+    console.log("📡 'Followers' listesi çekiliyor...");
+
+    while (pageCount < 30) {
       const params = new URLSearchParams({
         fid: fid,
+        viewer_fid: fid,
         limit: "100",
       });
+      
       if (cursor) params.append("cursor", cursor);
 
       const url = `https://api.neynar.com/v2/farcaster/followers?${params.toString()}`;
@@ -76,42 +91,55 @@ export async function GET(req: NextRequest) {
         cache: "no-store",
       });
 
-      if (!res.ok) break;
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error(`🔴 NEYNAR HATASI (Followers): ${res.status} - ${errText}`);
+        break;
+      }
 
       const data = await res.json();
       const users = data.users || [];
       
-      users.forEach((u: any) => allFollowers.set(u.fid, u));
-      
-      console.log(`   -> Followers Sayfa ${loop + 1}: ${users.length} kişi geldi.`);
+      allFollowers = [...allFollowers, ...users];
+      console.log(`   📄 Sayfa ${pageCount + 1}: ${users.length} kişi çekildi. (Toplam: ${allFollowers.length})`);
 
       cursor = data.next?.cursor || null;
-      if (!cursor) break;
-      loop++;
+      if (!cursor) {
+        console.log("   ✅ 'Followers' listesi bitti.");
+        break;
+      }
+      pageCount++;
     }
 
-    // --- SONUÇ ---
-    const followingList = Array.from(allFollowing.values());
-    const followersList = Array.from(allFollowers.values());
+    // --- SONUÇLARI HESAPLA ---
+    console.log(`📊 ANALİZ SONUCU: Following: ${allFollowing.length} | Followers: ${allFollowers.length}`);
 
-    console.log(`📊 TOPLAM: ${followingList.length} Takip Edilen, ${followersList.length} Takipçi`);
+    // Takipçi FID'lerini bir kümeye (Set) koy (Hızlı arama için)
+    const followerFids = new Set(allFollowers.map((u: any) => u.fid));
+    
+    // Seni takip etmeyenleri bul (Following listesinde olup, Follower setinde olmayanlar)
+    const nonFollowers = allFollowing.filter((u: any) => !followerFids.has(u.fid));
 
-    const followerFids = new Set(allFollowers.keys());
-    const nonFollowers = followingList.filter((u) => !followerFids.has(u.fid));
-    const isFollowingDev = allFollowing.has(REQUIRED_FOLLOW_FID);
+    // Geliştirici takibi kontrolü
+    const isFollowingDev = allFollowing.some((u: any) => u.fid === REQUIRED_FOLLOW_FID);
+
+    console.log(`💀 BULUNAN GHOST SAYISI: ${nonFollowers.length}`);
 
     return NextResponse.json({ 
       users: nonFollowers,
       isFollowingDev: isFollowingDev,
       stats: {
-        following: followingList.length,
-        followers: followersList.length,
+        following: allFollowing.length,
+        followers: allFollowers.length,
         notFollowingBack: nonFollowers.length
       }
     });
 
   } catch (error: any) {
-    console.error("🔴 Kritik Hata:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("🔥 KRİTİK SUNUCU HATASI:", error);
+    return NextResponse.json({ 
+      error: "Sunucu içi hata oluştu", 
+      details: error.message 
+    }, { status: 500 });
   }
 }
