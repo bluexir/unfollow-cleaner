@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { neynarClient } from "@/lib/neynar";
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -7,9 +6,15 @@ export const fetchCache = 'force-no-store';
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const fid = searchParams.get("fid");
+  
+  const API_KEY = process.env.NEYNAR_API_KEY;
 
   if (!fid) {
     return NextResponse.json({ error: "FID gerekli" }, { status: 400 });
+  }
+
+  if (!API_KEY) {
+    return NextResponse.json({ error: "API Key eksik" }, { status: 500 });
   }
 
   const fidNumber = parseInt(fid);
@@ -17,22 +22,35 @@ export async function GET(req: NextRequest) {
   try {
     console.log(`🚀 Analiz başlıyor - FID: ${fidNumber}`);
 
-    // 1️⃣ FOLLOWINGS (Takip Ettiklerin)
+    // ORTAK HEADER
+    const headers = {
+      "accept": "application/json",
+      "api_key": API_KEY,
+    };
+
+    // 1️⃣ FOLLOWINGS (Takip Ettiklerin) - V2 API
     const followingMap = new Map();
-    let followingCursor: string | undefined = undefined;
+    let followingCursor = "";
     let followingLoop = 0;
 
-    console.log("📡 Following listesi çekiliyor...");
+    console.log("📡 Following listesi çekiliyor (V2 API)...");
 
     do {
-      // ✅ DOĞRU SYNTAX: fetchUserFollowing(fid, options)
-      const result = await neynarClient.fetchUserFollowing(fidNumber, {
-        limit: 100,
-        cursor: followingCursor,
-      });
+      let url = `https://api.neynar.com/v2/farcaster/following?fid=${fidNumber}&limit=100`;
+      if (followingCursor) url += `&cursor=${followingCursor}`;
 
-      // ✅ Direkt result.users kullan (result.result.users DEĞİL!)
-      result.users.forEach((user: any) => {
+      const res = await fetch(url, { headers });
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("Following API Hatası:", errorText);
+        throw new Error(`Following API failed: ${res.status}`);
+      }
+
+      const data = await res.json();
+      const users = data.users || [];
+
+      users.forEach((user: any) => {
         followingMap.set(user.fid, {
           fid: user.fid,
           username: user.username,
@@ -42,36 +60,44 @@ export async function GET(req: NextRequest) {
         });
       });
 
-      followingCursor = result.next?.cursor;
+      followingCursor = data.next?.cursor || "";
       followingLoop++;
 
-      if (followingLoop >= 50) break;
+      if (followingLoop >= 50) break; // Güvenlik
     } while (followingCursor);
 
     console.log(`✅ Following tamamlandı: ${followingMap.size} kişi`);
 
-    // 2️⃣ FOLLOWERS (Seni Takip Edenler)
+    // 2️⃣ FOLLOWERS (Seni Takip Edenler) - V2 API
     const followersSet = new Set<number>();
-    let followersCursor: string | undefined = undefined;
+    let followersCursor = "";
     let followersLoop = 0;
 
-    console.log("📡 Followers listesi çekiliyor...");
+    console.log("📡 Followers listesi çekiliyor (V2 API)...");
 
     do {
-      // ✅ DOĞRU SYNTAX: fetchUserFollowers(fid, options)
-      const result = await neynarClient.fetchUserFollowers(fidNumber, {
-        limit: 100,
-        cursor: followersCursor,
-      });
+      let url = `https://api.neynar.com/v2/farcaster/followers?fid=${fidNumber}&limit=100`;
+      if (followersCursor) url += `&cursor=${followersCursor}`;
 
-      result.users.forEach((user: any) => {
+      const res = await fetch(url, { headers });
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("Followers API Hatası:", errorText);
+        throw new Error(`Followers API failed: ${res.status}`);
+      }
+
+      const data = await res.json();
+      const users = data.users || [];
+
+      users.forEach((user: any) => {
         followersSet.add(user.fid);
       });
 
-      followersCursor = result.next?.cursor;
+      followersCursor = data.next?.cursor || "";
       followersLoop++;
 
-      if (followersLoop >= 50) break;
+      if (followersLoop >= 50) break; // Güvenlik
     } while (followersCursor);
 
     console.log(`✅ Followers tamamlandı: ${followersSet.size} kişi`);
@@ -94,7 +120,7 @@ export async function GET(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error("🔥 HATA:", error);
+    console.error("🔥 HATA:", error.message);
     return NextResponse.json(
       { error: error.message || "Bir hata oluştu" },
       { status: 500 }
