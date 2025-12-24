@@ -7,11 +7,11 @@
   "frame": {
     "version": "1",
     "name": "Unfollow Cleaner",
-    "iconUrl": "https://unfollow-cleaner.vercel.app/icon.png",
+    "iconUrl": "https://i.imgur.com/OpUpX9j.jpg", 
     "homeUrl": "https://unfollow-cleaner.vercel.app",
     "imageUrl": "https://unfollow-cleaner.vercel.app/og-image.png",
-    "buttonTitle": "Temizliğe Başla",
-    "splashImageUrl": "https://unfollow-cleaner.vercel.app/splash.png",
+    "buttonTitle": "Check Ghosts",
+    "splashImageUrl": "https://i.imgur.com/OpUpX9j.jpg", 
     "splashBackgroundColor": "#0f1117", 
     "webhookUrl": "https://unfollow-cleaner.vercel.app/api/webhook"
   }
