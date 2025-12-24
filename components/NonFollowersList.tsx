@@ -24,6 +24,11 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
   const [error, setError] = useState<string | null>(null);
   const [showSharePopup, setShowSharePopup] = useState(false);
   const [unfollowCount, setUnfollowCount] = useState(0);
+  const [stats, setStats] = useState<{
+    following: number;
+    followers: number;
+    nonFollowersCount: number;
+  } | null>(null);
 
   useEffect(() => {
     fetchNonFollowers();
@@ -41,13 +46,20 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
         throw new Error(data.error);
       }
 
+      // Follower sayısına göre sırala (az olanlar üstte)
       const sorted = data.nonFollowers.sort((a: NonFollower, b: NonFollower) => 
         a.follower_count - b.follower_count
       );
 
       setNonFollowers(sorted);
+      
+      // İstatistikleri kaydet
+      if (data.stats) {
+        setStats(data.stats);
+      }
+
     } catch (error: any) {
-      setError(error.message || 'Failed to load non-followers');
+      setError(error.message || 'Non-followers yüklenemedi');
     } finally {
       setIsLoading(false);
     }
@@ -97,13 +109,23 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
 
       setUnfollowCount(selectedUsers.size);
       
+      // Listeden çıkar
       const remaining = nonFollowers.filter(u => !selectedUsers.has(u.fid));
       setNonFollowers(remaining);
       setSelectedUsers(new Set());
       
+      // İstatistikleri güncelle
+      if (stats) {
+        setStats({
+          ...stats,
+          following: stats.following - selectedUsers.size,
+          nonFollowersCount: remaining.length,
+        });
+      }
+      
       setShowSharePopup(true);
     } catch (error: any) {
-      setError(error.message || 'Failed to unfollow users');
+      setError(error.message || 'Unfollow işlemi başarısız');
     } finally {
       setIsUnfollowing(false);
     }
@@ -113,7 +135,7 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
     return (
       <div className="text-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-farcaster-purple mx-auto mb-4"></div>
-        <p className="text-gray-400">Loading non-followers...</p>
+        <p className="text-gray-400">Non-followers analiz ediliyor...</p>
       </div>
     );
   }
@@ -121,7 +143,8 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
   if (error) {
     return (
       <div className="bg-red-900/50 border border-red-700 text-red-200 px-6 py-4 rounded-lg">
-        {error}
+        <p className="font-bold mb-2">❌ Hata</p>
+        <p>{error}</p>
       </div>
     );
   }
@@ -134,10 +157,16 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h3 className="text-2xl font-bold mb-2">All Clean!</h3>
+        <h3 className="text-2xl font-bold mb-2">Hepsi Temiz! 🎉</h3>
         <p className="text-gray-400">
-          Everyone you follow follows you back 🎉
+          Takip ettiğin herkes seni de takip ediyor
         </p>
+        {stats && (
+          <div className="mt-6 text-sm text-gray-500">
+            <p>Takip Ettiğin: {stats.following}</p>
+            <p>Takipçi: {stats.followers}</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -145,9 +174,27 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
   return (
     <>
       <div className="mb-8">
+        {/* İstatistikler */}
+        {stats && (
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="bg-farcaster-dark border border-gray-700 rounded-lg p-4 text-center">
+              <p className="text-2xl font-bold text-farcaster-purple">{stats.following}</p>
+              <p className="text-sm text-gray-400">Takip Ettiğin</p>
+            </div>
+            <div className="bg-farcaster-dark border border-gray-700 rounded-lg p-4 text-center">
+              <p className="text-2xl font-bold text-green-500">{stats.followers}</p>
+              <p className="text-sm text-gray-400">Takipçi</p>
+            </div>
+            <div className="bg-farcaster-dark border border-gray-700 rounded-lg p-4 text-center">
+              <p className="text-2xl font-bold text-red-500">{stats.nonFollowersCount}</p>
+              <p className="text-sm text-gray-400">Takip Etmiyor</p>
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold">
-            Non-Followers ({nonFollowers.length})
+            Seni Takip Etmeyenler ({nonFollowers.length})
           </h2>
           {selectedUsers.size > 0 && (
             <button
@@ -155,14 +202,14 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
               disabled={isUnfollowing}
               className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg transition-all duration-200"
             >
-              {isUnfollowing ? 'Unfollowing...' : `Unfollow Selected (${selectedUsers.size})`}
+              {isUnfollowing ? 'Unfollowing...' : `Unfollow (${selectedUsers.size})`}
             </button>
           )}
         </div>
 
         <div className="bg-blue-900/30 border border-blue-700/50 rounded-lg p-4 mb-6">
           <p className="text-sm text-blue-200">
-            💡 To avoid spam restrictions, unfollow 5-10 users at a time
+            💡 Spam kısıtlamalarından kaçınmak için 5-10 kişiyi bir seferde unfollow edin
           </p>
         </div>
 
@@ -174,7 +221,7 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
               onChange={toggleSelectAll}
               className="w-5 h-5 rounded border-gray-600 text-farcaster-purple focus:ring-farcaster-purple"
             />
-            <span className="font-medium">Select All</span>
+            <span className="font-medium">Hepsini Seç</span>
           </label>
         </div>
 
@@ -201,7 +248,7 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
                   <div className="text-sm text-gray-400">@{user.username}</div>
                 </div>
                 <div className="text-sm text-gray-500">
-                  {user.follower_count} followers
+                  {user.follower_count.toLocaleString()} takipçi
                 </div>
               </label>
             </div>
