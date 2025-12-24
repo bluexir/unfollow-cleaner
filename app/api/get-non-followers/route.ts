@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { neynarClient, REQUIRED_FOLLOW_FID } from "@/lib/neynar";
+import { neynarClient } from "@/lib/neynar";
+
+// Sabiti buraya da manuel ekliyoruz (Sunucu tarafı olduğu için sorun yok)
+const REQUIRED_FOLLOW_FID = 429973; 
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -12,12 +15,11 @@ export async function GET(req: NextRequest) {
   try {
     const userFid = parseInt(fid);
 
-    // --- AJAN 1: Kimi Takip Ediyorsun? (Hepsini Çek) ---
+    // --- AJAN 1: Kimi Takip Ediyorsun? ---
     let allFollowing: any[] = [];
     let followingCursor: string | null = "";
     let loopCount = 0; 
 
-    // Sonsuz döngü koruması (Max 50 sayfa)
     while (followingCursor !== null && loopCount < 50) {
       const res: any = await neynarClient.fetchUserFollowing({
         fid: userFid,
@@ -30,7 +32,7 @@ export async function GET(req: NextRequest) {
       loopCount++;
     }
 
-    // --- AJAN 2: Seni Kim Takip Ediyor? (Hepsini Çek) ---
+    // --- AJAN 2: Seni Kim Takip Ediyor? ---
     let allFollowers: any[] = [];
     let followersCursor: string | null = "";
     loopCount = 0;
@@ -51,13 +53,12 @@ export async function GET(req: NextRequest) {
     const followerFids = new Set(allFollowers.map((u) => u.fid));
     const nonFollowers = allFollowing.filter((u) => !followerFids.has(u.fid));
 
-    // KRİTİK KONTROL: Kullanıcının takip ettikleri listesinde SEN (Bluexir) var mısın?
-    // REQUIRED_FOLLOW_FID (429973) lib/neynar.ts dosyasından geliyor.
+    // KİLİT KONTROLÜ
     const isFollowingDev = allFollowing.some((u) => u.fid === REQUIRED_FOLLOW_FID);
 
     return NextResponse.json({ 
       users: nonFollowers,
-      isFollowingDev: isFollowingDev, // Kilit anahtarı burada
+      isFollowingDev: isFollowingDev,
       stats: {
         following: allFollowing.length,
         followers: allFollowers.length,
