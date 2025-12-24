@@ -5,6 +5,7 @@ import sdk from "@farcaster/frame-sdk";
 
 // --- AYARLAR ---
 const REQUIRED_FOLLOW_FID = 429973; // Bluexir
+const ADMIN_FID = 429973; // Admin ID (Sen)
 
 interface User {
   fid: number;
@@ -25,19 +26,18 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
   const [loading, setLoading] = useState(false);
   const [isFollowingDev, setIsFollowingDev] = useState(false); 
   const [currency, setCurrency] = useState<"ETH" | "DEGEN" | "USDC">("ETH");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null); // Hata mesajı için yeni alan
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!user?.fid) return;
     setLoading(true);
-    setErrorMessage(null); // Hatayı temizle
+    setErrorMessage(null);
     try {
       const res = await fetch(`/api/get-non-followers?fid=${user.fid}`);
       
       const data = await res.json();
 
       if (!res.ok) {
-        // API Köstebeğinden gelen gerçek hatayı ekrana basıyoruz
         console.error("API Hatası Detayı:", data);
         setErrorMessage(data.details || "Sunucu hatası oluştu.");
         return;
@@ -45,7 +45,13 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
 
       setNonFollowers(data.users || []);
       setStats(data.stats || null);
-      setIsFollowingDev(data.isFollowingDev); 
+      
+      // Admin ise her zaman takip ediyor say (Bypass)
+      if (user.fid === ADMIN_FID) {
+        setIsFollowingDev(true);
+      } else {
+        setIsFollowingDev(data.isFollowingDev); 
+      }
       
     } catch (error) {
       console.error("Bağlantı hatası:", error);
@@ -77,15 +83,8 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
     sdk.actions.viewProfile({ fid: REQUIRED_FOLLOW_FID });
   };
 
-  // --- GÜVENLİ BAHŞİŞ SİSTEMİ (INTENTS) ---
-  // MetaMask hatası vermez. Direkt Warpcast profilini veya Cast ekranını açar.
   const handleTip = (amount: number) => {
-    // 1. Yöntem: Direkt Profil Açma (En güvenlisi)
-    // Kullanıcı profiline gidip oradan "Send Money" diyebilir.
     sdk.actions.viewProfile({ fid: REQUIRED_FOLLOW_FID });
-    
-    // Alternatif Yöntem: Eğer Warpcast desteklerse direkt "Send" ekranı açılabilir
-    // sdk.actions.openUrl(`https://warpcast.com/~/pay?recipient=bluexir&amount=${amount}`);
   };
 
   const getTipOptions = () => {
@@ -105,7 +104,6 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
     );
   }
 
-  // EĞER HATA VARSA KIRMIZI EKRAN GÖSTER
   if (errorMessage) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
@@ -120,6 +118,10 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
       </div>
     );
   }
+
+  // --- KİLİT MANTIĞI (ADMIN BYPASS EKLENDİ) ---
+  // Eğer kullanıcı Admin (429973) ise, isFollowingDev'e bakma, direkt false döndür (Kilit yok)
+  const isLocked = user?.fid !== ADMIN_FID && !isFollowingDev;
 
   return (
     <div className="min-h-screen pb-12 px-4 pt-6 max-w-md mx-auto relative">
@@ -158,7 +160,8 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
           DETECTED GHOSTS ({nonFollowers.length})
         </h3>
         
-        {!isFollowingDev && nonFollowers.length > 0 ? (
+        {/* KİLİT KONTROLÜ BURADA */}
+        {isLocked && nonFollowers.length > 0 ? (
           <div className="relative">
             <div className="space-y-3 filter blur-md select-none opacity-50 pointer-events-none">
               {nonFollowers.slice(0, 4).map((u) => (
