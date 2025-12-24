@@ -4,11 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import sdk from "@farcaster/frame-sdk";
 
 // --- AYARLAR ---
-// Sabitleri buraya aldık, böylece sunucu dosyasına bağımlılık kalmadı.
-const REQUIRED_FOLLOW_FID = 429973; // Senin FID numaran (Bluexir)
-const WALLET_ADDR = "0xaDBd1712D5c6e2A4D7e08F50a9586d3C054E30c8"; 
-const USDC_ADDR = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // Base USDC
-const DEGEN_ADDR = "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"; // Base DEGEN
+const REQUIRED_FOLLOW_FID = 429973; // Senin FID (Bluexir)
 
 interface User {
   fid: number;
@@ -35,8 +31,13 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
     setLoading(true);
     try {
       const res = await fetch(`/api/get-non-followers?fid=${user.fid}`);
-      const data = await res.json();
       
+      if (!res.ok) {
+        console.error("API Hatası:", res.status);
+        return;
+      }
+
+      const data = await res.json();
       setNonFollowers(data.users || []);
       setStats(data.stats || null);
       setIsFollowingDev(data.isFollowingDev); 
@@ -70,35 +71,11 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
     sdk.actions.viewProfile({ fid: REQUIRED_FOLLOW_FID });
   };
 
-  const handleTip = async (amount: number) => {
-    try {
-      let txData = {
-        to: WALLET_ADDR,
-        value: "0",
-        data: "0x",
-        chainId: "eip155:8453", // Base Mainnet
-      };
-
-      if (currency === "ETH") {
-        const wei = BigInt(amount * 1000000000000000000).toString();
-        txData.value = wei;
-      } else {
-        const contract = currency === "USDC" ? USDC_ADDR : DEGEN_ADDR;
-        const decimals = currency === "USDC" ? 6 : 18;
-        const rawAmount = BigInt(amount * (10 ** decimals));
-        
-        const amountHex = rawAmount.toString(16).padStart(64, "0");
-        const addressHex = WALLET_ADDR.replace("0x", "").padStart(64, "0");
-        const data = `0xa9059cbb${addressHex}${amountHex}`;
-
-        txData.to = contract;
-        txData.data = data;
-      }
-
-      await sdk.wallet.sendTransaction(txData);
-    } catch (error) {
-      console.error("Transfer hatası:", error);
-    }
+  // GÜVENLİ BAHŞİŞ FONKSİYONU
+  // Cüzdan hatasını önlemek için şimdilik profil linkini açıyoruz.
+  const handleTip = () => {
+    // Profilini açar, oradan bahşiş atabilirler veya iletişime geçerler
+    sdk.actions.viewProfile({ fid: REQUIRED_FOLLOW_FID });
   };
 
   const getTipOptions = () => {
@@ -252,7 +229,7 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
             {getTipOptions().map((amount) => (
               <button
                 key={amount}
-                onClick={() => handleTip(amount)}
+                onClick={handleTip} // Artık güvenli fonksiyonu çağırıyor
                 className="bg-white/5 hover:bg-white/10 border border-white/5 py-3 rounded-xl text-sm font-bold text-white transition-all active:scale-95"
               >
                 {amount} {currency === 'ETH' ? '' : currency === 'USDC' ? '$' : ''}
