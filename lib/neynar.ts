@@ -4,9 +4,7 @@ if (!process.env.NEYNAR_API_KEY) {
   throw new Error("NEYNAR_API_KEY ortam değişkeni eksik!");
 }
 
+// Bu istemci SADECE sunucu tarafında (API dosyalarında) kullanılmalıdır.
 export const neynarClient = new NeynarAPIClient({
   apiKey: process.env.NEYNAR_API_KEY,
 });
-
-export const REQUIRED_FOLLOW_FID = 429973;
-export const REQUIRED_FOLLOW_USERNAME = 'bluexir';
