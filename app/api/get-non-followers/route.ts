@@ -17,10 +17,10 @@ export async function GET(req: NextRequest) {
 
   console.log(`🚀 [MODERN-FIX] Analiz Başlıyor. FID: ${fid}`);
 
-  // --- ORTAK HEADER AYARLARI (Senin görselindeki x-api-key formatı) ---
+  // --- ORTAK HEADER AYARLARI ---
   const headers: any = {
     "accept": "application/json",
-    "x-api-key": API_KEY // Kritik Değişiklik: api_key -> x-api-key
+    "x-api-key": API_KEY 
   };
   
   // Eğer UUID varsa, okuma işlemine de yetki katıyoruz
@@ -37,11 +37,10 @@ export async function GET(req: NextRequest) {
     console.log("📡 'Following' listesi çekiliyor...");
 
     while (loop < 50) {
-      // viewer_fid ekliyoruz ki "Ajan" gözüyle baksın, ama limit=100 ile
       let url = `https://api.neynar.com/v2/farcaster/following?fid=${fid}&viewer_fid=${fid}&limit=100`;
       if (cursor) url += `&cursor=${cursor}`;
 
-      const res = await fetch(url, { headers }); // Güncellenmiş Headerlar
+      const res = await fetch(url, { headers });
 
       if (!res.ok) {
         console.error("🔴 API Hatası (Following):", await res.text());
@@ -53,7 +52,6 @@ export async function GET(req: NextRequest) {
       
       users.forEach((u: any) => followingMap.set(u.fid, u));
       
-      // LOG: Gelen ilk kişinin adını yazdıralım ki "1" kişi kimmiş görelim
       if (loop === 0 && users.length > 0) {
         console.log(`   🔎 İlk çekilen kişi örneği: ${users[0].username} (FID: ${users[0].fid})`);
       }
@@ -95,8 +93,10 @@ export async function GET(req: NextRequest) {
     const followerFids = new Set(followersMap.keys());
     const nonFollowers = followingList.filter((u) => !followerFids.has(u.fid));
 
+    // --- KRİTİK DÜZELTME BURADA YAPILDI ---
     return NextResponse.json({ 
-      users: nonFollowers,
+      nonFollowers: nonFollowers, // <--- YENİ: Frontend bunu bekliyor!
+      users: nonFollowers,        // <--- ESKİ: Yedek olarak kalsın
       stats: {
         following: followingMap.size,
         followers: followersMap.size,
