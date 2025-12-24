@@ -20,35 +20,38 @@ export async function GET(req: NextRequest) {
   const fidNumber = parseInt(fid);
 
   try {
-    console.log(`🚀 Analiz başlıyor - FID: ${fidNumber}`);
+    console.log(`🚀 [START] Analiz başlıyor - FID: ${fidNumber}`);
 
-    // ORTAK HEADER
     const headers = {
       "accept": "application/json",
       "api_key": API_KEY,
     };
 
-    // 1️⃣ FOLLOWINGS (Takip Ettiklerin) - V2 API
+    // 1️⃣ FOLLOWINGS
     const followingMap = new Map();
     let followingCursor = "";
     let followingLoop = 0;
 
-    console.log("📡 Following listesi çekiliyor (V2 API)...");
+    console.log("📡 [FOLLOWING] İstek başlıyor...");
 
     do {
       let url = `https://api.neynar.com/v2/farcaster/following?fid=${fidNumber}&limit=100`;
       if (followingCursor) url += `&cursor=${followingCursor}`;
 
+      console.log(`   ↪️ [FOLLOWING] Loop ${followingLoop + 1} - URL: ${url}`); // ← YENİ LOG
+
       const res = await fetch(url, { headers });
       
       if (!res.ok) {
         const errorText = await res.text();
-        console.error("Following API Hatası:", errorText);
+        console.error(`❌ [FOLLOWING] API Hatası:`, errorText);
         throw new Error(`Following API failed: ${res.status}`);
       }
 
       const data = await res.json();
       const users = data.users || [];
+
+      console.log(`   ✅ [FOLLOWING] Loop ${followingLoop + 1} - ${users.length} kişi geldi`); // ← YENİ LOG
 
       users.forEach((user: any) => {
         followingMap.set(user.fid, {
@@ -63,32 +66,36 @@ export async function GET(req: NextRequest) {
       followingCursor = data.next?.cursor || "";
       followingLoop++;
 
-      if (followingLoop >= 50) break; // Güvenlik
+      if (followingLoop >= 50) break;
     } while (followingCursor);
 
-    console.log(`✅ Following tamamlandı: ${followingMap.size} kişi`);
+    console.log(`✅ [FOLLOWING] TAMAMLANDI - Toplam: ${followingMap.size} kişi, Loop: ${followingLoop}`); // ← YENİ LOG
 
-    // 2️⃣ FOLLOWERS (Seni Takip Edenler) - V2 API
+    // 2️⃣ FOLLOWERS
     const followersSet = new Set<number>();
     let followersCursor = "";
     let followersLoop = 0;
 
-    console.log("📡 Followers listesi çekiliyor (V2 API)...");
+    console.log("📡 [FOLLOWERS] İstek başlıyor...");
 
     do {
       let url = `https://api.neynar.com/v2/farcaster/followers?fid=${fidNumber}&limit=100`;
       if (followersCursor) url += `&cursor=${followersCursor}`;
 
+      console.log(`   ↪️ [FOLLOWERS] Loop ${followersLoop + 1} - URL: ${url}`); // ← YENİ LOG
+
       const res = await fetch(url, { headers });
       
       if (!res.ok) {
         const errorText = await res.text();
-        console.error("Followers API Hatası:", errorText);
+        console.error(`❌ [FOLLOWERS] API Hatası:`, errorText);
         throw new Error(`Followers API failed: ${res.status}`);
       }
 
       const data = await res.json();
       const users = data.users || [];
+
+      console.log(`   ✅ [FOLLOWERS] Loop ${followersLoop + 1} - ${users.length} kişi geldi`); // ← YENİ LOG
 
       users.forEach((user: any) => {
         followersSet.add(user.fid);
@@ -97,10 +104,10 @@ export async function GET(req: NextRequest) {
       followersCursor = data.next?.cursor || "";
       followersLoop++;
 
-      if (followersLoop >= 50) break; // Güvenlik
+      if (followersLoop >= 50) break;
     } while (followersCursor);
 
-    console.log(`✅ Followers tamamlandı: ${followersSet.size} kişi`);
+    console.log(`✅ [FOLLOWERS] TAMAMLANDI - Toplam: ${followersSet.size} kişi, Loop: ${followersLoop}`); // ← YENİ LOG
 
     // 3️⃣ ANALİZ
     const followingList = Array.from(followingMap.values());
@@ -108,7 +115,8 @@ export async function GET(req: NextRequest) {
       (user) => !followersSet.has(user.fid)
     );
 
-    console.log(`🎯 Sonuç: ${nonFollowers.length} kişi seni takip etmiyor`);
+    console.log(`🎯 [SONUÇ] Non-followers: ${nonFollowers.length} kişi`);
+    console.log(`📊 [STATS] Following: ${followingMap.size}, Followers: ${followersSet.size}`); // ← YENİ LOG
 
     return NextResponse.json({
       nonFollowers: nonFollowers,
@@ -120,7 +128,7 @@ export async function GET(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error("🔥 HATA:", error.message);
+    console.error("🔥 [ERROR] HATA:", error.message);
     return NextResponse.json(
       { error: error.message || "Bir hata oluştu" },
       { status: 500 }
