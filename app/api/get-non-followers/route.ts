@@ -38,8 +38,6 @@ export async function GET(req: NextRequest) {
       let url = `https://api.neynar.com/v2/farcaster/following?fid=${fidNumber}&limit=100`;
       if (followingCursor) url += `&cursor=${followingCursor}`;
 
-      console.log(`   ↪️ [FOLLOWING] Loop ${followingLoop + 1}`);
-
       const res = await fetch(url, { headers });
       
       if (!res.ok) {
@@ -52,20 +50,19 @@ export async function GET(req: NextRequest) {
       const users = data.users || [];
 
       console.log(`   ✅ [FOLLOWING] Loop ${followingLoop + 1} - ${users.length} kişi geldi`);
-      
-      // İLK KİŞİYİ LOGLA
-      if (followingLoop === 0 && users.length > 0) {
-        console.log(`   🔍 [DEBUG] İlk kişi:`, JSON.stringify(users[0], null, 2));
-      }
 
-      users.forEach((user: any) => {
-        followingMap.set(user.fid, {
-          fid: user.fid,
-          username: user.username,
-          display_name: user.display_name || user.username,
-          pfp_url: user.pfp_url,
-          follower_count: user.follower_count,
-        });
+      // ✅ DÜZELTİLDİ: item.user kullan!
+      users.forEach((item: any) => {
+        const user = item.user; // ← Önce user objesini al
+        if (user && user.fid) {
+          followingMap.set(user.fid, {
+            fid: user.fid,
+            username: user.username,
+            display_name: user.display_name || user.username,
+            pfp_url: user.pfp_url,
+            follower_count: user.follower_count,
+          });
+        }
       });
 
       console.log(`   📊 Map size şu anda: ${followingMap.size}`);
@@ -89,8 +86,6 @@ export async function GET(req: NextRequest) {
       let url = `https://api.neynar.com/v2/farcaster/followers?fid=${fidNumber}&limit=100`;
       if (followersCursor) url += `&cursor=${followersCursor}`;
 
-      console.log(`   ↪️ [FOLLOWERS] Loop ${followersLoop + 1}`);
-
       const res = await fetch(url, { headers });
       
       if (!res.ok) {
@@ -103,14 +98,13 @@ export async function GET(req: NextRequest) {
       const users = data.users || [];
 
       console.log(`   ✅ [FOLLOWERS] Loop ${followersLoop + 1} - ${users.length} kişi geldi`);
-      
-      // İLK KİŞİYİ LOGLA
-      if (followersLoop === 0 && users.length > 0) {
-        console.log(`   🔍 [DEBUG] İlk takipçi:`, JSON.stringify(users[0], null, 2));
-      }
 
-      users.forEach((user: any) => {
-        followersSet.add(user.fid);
+      // ✅ DÜZELTİLDİ: item.user kullan!
+      users.forEach((item: any) => {
+        const user = item.user; // ← Önce user objesini al
+        if (user && user.fid) {
+          followersSet.add(user.fid);
+        }
       });
 
       console.log(`   📊 Set size şu anda: ${followersSet.size}`);
