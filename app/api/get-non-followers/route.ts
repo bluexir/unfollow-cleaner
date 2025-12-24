@@ -1,26 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neynarClient } from "@/lib/neynar";
 
-// Sabiti buraya da manuel ekliyoruz (Sunucu tarafı olduğu için sorun yok)
 const REQUIRED_FOLLOW_FID = 429973; 
 
 export async function GET(req: NextRequest) {
+  // --- KÖSTEBEK LOGLARI BAŞLIYOR ---
+  console.log("🟢 API İsteği Alındı. İşlem Başlıyor...");
+
   const { searchParams } = new URL(req.url);
   const fid = searchParams.get("fid");
 
   if (!fid) {
-    return NextResponse.json({ error: "FID required" }, { status: 400 });
+    console.error("🔴 HATA: FID parametresi eksik!");
+    return NextResponse.json({ error: "FID is required" }, { status: 400 });
   }
 
-  try {
-    const userFid = parseInt(fid);
+  const userFid = parseInt(fid);
+  console.log(`👤 Analiz Edilen Kullanıcı FID: ${userFid}`);
 
-    // --- AJAN 1: Kimi Takip Ediyorsun? ---
+  try {
+    // API Anahtarı Kontrolü
+    if (!process.env.NEYNAR_API_KEY) {
+      throw new Error("NEYNAR_API_KEY bulunamadı! Vercel ayarlarını kontrol et.");
+    }
+    console.log("🔑 API Anahtarı mevcut. Neynar'a bağlanılıyor...");
+
+    // 1. TAKİP ETTİKLERİNİ ÇEK
+    console.log("📡 Takip edilenler çekiliyor...");
     let allFollowing: any[] = [];
     let followingCursor: string | null = "";
     let loopCount = 0; 
 
-    while (followingCursor !== null && loopCount < 50) {
+    // Güvenlik limiti: Max 20 sayfa (2000 kişi) - Test için düşürdük
+    while (followingCursor !== null && loopCount < 20) {
       const res: any = await neynarClient.fetchUserFollowing({
         fid: userFid,
         limit: 100,
@@ -30,14 +42,16 @@ export async function GET(req: NextRequest) {
       allFollowing = [...allFollowing, ...res.users];
       followingCursor = res.next.cursor;
       loopCount++;
+      console.log(`   ↳ Sayfa ${loopCount} çekildi. Toplam: ${allFollowing.length} kişi.`);
     }
 
-    // --- AJAN 2: Seni Kim Takip Ediyor? ---
+    // 2. SENİ TAKİP EDENLERİ ÇEK
+    console.log("📡 Seni takip edenler çekiliyor...");
     let allFollowers: any[] = [];
     let followersCursor: string | null = "";
     loopCount = 0;
 
-    while (followersCursor !== null && loopCount < 50) {
+    while (followersCursor !== null && loopCount < 20) {
       const res: any = await neynarClient.fetchUserFollowers({
         fid: userFid,
         limit: 100,
@@ -47,15 +61,19 @@ export async function GET(req: NextRequest) {
       allFollowers = [...allFollowers, ...res.users];
       followersCursor = res.next.cursor;
       loopCount++;
+      console.log(`   ↳ Sayfa ${loopCount} çekildi. Toplam: ${allFollowers.length} kişi.`);
     }
 
-    // --- AJAN 3: Karşılaştırma ve İhbar ---
+    // 3. KARŞILAŞTIRMA
+    console.log("⚡ Karşılaştırma yapılıyor...");
     const followerFids = new Set(allFollowers.map((u) => u.fid));
     const nonFollowers = allFollowing.filter((u) => !followerFids.has(u.fid));
 
-    // KİLİT KONTROLÜ
+    // Kilit Kontrolü
     const isFollowingDev = allFollowing.some((u) => u.fid === REQUIRED_FOLLOW_FID);
+    console.log(`🔒 Geliştirici Takip Durumu: ${isFollowingDev ? "AÇIK" : "KİLİTLİ"}`);
 
+    console.log("✅ İŞLEM BAŞARILI! Sonuçlar gönderiliyor.");
     return NextResponse.json({ 
       users: nonFollowers,
       isFollowingDev: isFollowingDev,
@@ -66,8 +84,15 @@ export async function GET(req: NextRequest) {
       }
     });
 
-  } catch (error) {
-    console.error("API Error:", error);
-    return NextResponse.json({ error: "Failed to fetch data" }, { status: 500 });
+  } catch (error: any) {
+    // DETAYLI HATA RAPORU
+    console.error("🔴 KRİTİK HATA OLUŞTU:", error);
+    
+    // Hatayı gizleme, direkt ekrana bas (Debugging için)
+    return NextResponse.json({ 
+      error: "Sunucu Hatası", 
+      details: error.message || "Bilinmeyen hata",
+      stack: error.stack 
+    }, { status: 500 });
   }
 }
