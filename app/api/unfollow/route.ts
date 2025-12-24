@@ -1,36 +1,50 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY;
+import { neynarClient } from "@/lib/neynar";
 
 export async function POST(req: NextRequest) {
   try {
-    const { targetFid } = await req.json();
+    const body = await req.json();
+    const { signer_uuid, target_fids } = body;
 
-    if (!targetFid) {
-      return NextResponse.json({ error: "Hedef FID gerekli" }, { status: 400 });
+    if (!signer_uuid || !target_fids || !Array.isArray(target_fids)) {
+      return NextResponse.json(
+        { error: "signer_uuid ve target_fids gerekli" },
+        { status: 400 }
+      );
     }
 
-    // Neynar üzerinden takibi bırakma işlemi
-    const response = await fetch("https://api.neynar.com/v2/farcaster/user/follow", {
-      method: "DELETE",
-      headers: {
-        accept: "application/json",
-        api_key: NEYNAR_API_KEY || "",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        target_fids: [targetFid],
-      }),
+    console.log(`🔄 Unfollow başlıyor: ${target_fids.length} kişi`);
+
+    const results = [];
+    const errors = [];
+
+    // Her FID için unfollow (rate limiting için gecikme ekle)
+    for (const targetFid of target_fids) {
+      try {
+        await neynarClient.unfollowUser(signer_uuid, targetFid);
+        results.push({ fid: targetFid, success: true });
+        
+        // Rate limiting için küçük bekleme (100ms)
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error: any) {
+        console.error(`❌ Unfollow hatası (FID: ${targetFid}):`, error.message);
+        errors.push({ fid: targetFid, error: error.message });
+      }
+    }
+
+    console.log(`✅ Unfollow tamamlandı: ${results.length} başarılı, ${errors.length} hata`);
+
+    return NextResponse.json({
+      success: true,
+      results,
+      errors: errors.length > 0 ? errors : undefined,
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Takibi bırakma başarısız");
-    }
-
-    return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Unfollow API Hatası:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("🔥 Unfollow API hatası:", error.message);
+    return NextResponse.json(
+      { error: error.message || "Unfollow işlemi başarısız" },
+      { status: 500 }
+    );
   }
 }
