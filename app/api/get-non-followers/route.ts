@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
       let url = `https://api.neynar.com/v2/farcaster/following?fid=${fidNumber}&limit=100`;
       if (followingCursor) url += `&cursor=${followingCursor}`;
 
-      console.log(`   ↪️ [FOLLOWING] Loop ${followingLoop + 1} - URL: ${url}`); // ← YENİ LOG
+      console.log(`   ↪️ [FOLLOWING] Loop ${followingLoop + 1}`);
 
       const res = await fetch(url, { headers });
       
@@ -51,7 +51,12 @@ export async function GET(req: NextRequest) {
       const data = await res.json();
       const users = data.users || [];
 
-      console.log(`   ✅ [FOLLOWING] Loop ${followingLoop + 1} - ${users.length} kişi geldi`); // ← YENİ LOG
+      console.log(`   ✅ [FOLLOWING] Loop ${followingLoop + 1} - ${users.length} kişi geldi`);
+      
+      // İLK KİŞİYİ LOGLA
+      if (followingLoop === 0 && users.length > 0) {
+        console.log(`   🔍 [DEBUG] İlk kişi:`, JSON.stringify(users[0], null, 2));
+      }
 
       users.forEach((user: any) => {
         followingMap.set(user.fid, {
@@ -63,13 +68,15 @@ export async function GET(req: NextRequest) {
         });
       });
 
+      console.log(`   📊 Map size şu anda: ${followingMap.size}`);
+
       followingCursor = data.next?.cursor || "";
       followingLoop++;
 
       if (followingLoop >= 50) break;
     } while (followingCursor);
 
-    console.log(`✅ [FOLLOWING] TAMAMLANDI - Toplam: ${followingMap.size} kişi, Loop: ${followingLoop}`); // ← YENİ LOG
+    console.log(`✅ [FOLLOWING] TAMAMLANDI - Toplam: ${followingMap.size} kişi, Loop: ${followingLoop}`);
 
     // 2️⃣ FOLLOWERS
     const followersSet = new Set<number>();
@@ -82,7 +89,7 @@ export async function GET(req: NextRequest) {
       let url = `https://api.neynar.com/v2/farcaster/followers?fid=${fidNumber}&limit=100`;
       if (followersCursor) url += `&cursor=${followersCursor}`;
 
-      console.log(`   ↪️ [FOLLOWERS] Loop ${followersLoop + 1} - URL: ${url}`); // ← YENİ LOG
+      console.log(`   ↪️ [FOLLOWERS] Loop ${followersLoop + 1}`);
 
       const res = await fetch(url, { headers });
       
@@ -95,11 +102,18 @@ export async function GET(req: NextRequest) {
       const data = await res.json();
       const users = data.users || [];
 
-      console.log(`   ✅ [FOLLOWERS] Loop ${followersLoop + 1} - ${users.length} kişi geldi`); // ← YENİ LOG
+      console.log(`   ✅ [FOLLOWERS] Loop ${followersLoop + 1} - ${users.length} kişi geldi`);
+      
+      // İLK KİŞİYİ LOGLA
+      if (followersLoop === 0 && users.length > 0) {
+        console.log(`   🔍 [DEBUG] İlk takipçi:`, JSON.stringify(users[0], null, 2));
+      }
 
       users.forEach((user: any) => {
         followersSet.add(user.fid);
       });
+
+      console.log(`   📊 Set size şu anda: ${followersSet.size}`);
 
       followersCursor = data.next?.cursor || "";
       followersLoop++;
@@ -107,7 +121,7 @@ export async function GET(req: NextRequest) {
       if (followersLoop >= 50) break;
     } while (followersCursor);
 
-    console.log(`✅ [FOLLOWERS] TAMAMLANDI - Toplam: ${followersSet.size} kişi, Loop: ${followersLoop}`); // ← YENİ LOG
+    console.log(`✅ [FOLLOWERS] TAMAMLANDI - Toplam: ${followersSet.size} kişi, Loop: ${followersLoop}`);
 
     // 3️⃣ ANALİZ
     const followingList = Array.from(followingMap.values());
@@ -116,7 +130,7 @@ export async function GET(req: NextRequest) {
     );
 
     console.log(`🎯 [SONUÇ] Non-followers: ${nonFollowers.length} kişi`);
-    console.log(`📊 [STATS] Following: ${followingMap.size}, Followers: ${followersSet.size}`); // ← YENİ LOG
+    console.log(`📊 [STATS] Following: ${followingMap.size}, Followers: ${followersSet.size}`);
 
     return NextResponse.json({
       nonFollowers: nonFollowers,
