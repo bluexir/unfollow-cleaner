@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import sdk from "@farcaster/frame-sdk";
 
 // --- AYARLAR ---
-const REQUIRED_FOLLOW_FID = 429973; // Senin FID (Bluexir)
+const REQUIRED_FOLLOW_FID = 429973; // Bluexir
 
 interface User {
   fid: number;
@@ -25,25 +25,31 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
   const [loading, setLoading] = useState(false);
   const [isFollowingDev, setIsFollowingDev] = useState(false); 
   const [currency, setCurrency] = useState<"ETH" | "DEGEN" | "USDC">("ETH");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // Hata mesajı için yeni alan
 
   const fetchData = useCallback(async () => {
     if (!user?.fid) return;
     setLoading(true);
+    setErrorMessage(null); // Hatayı temizle
     try {
       const res = await fetch(`/api/get-non-followers?fid=${user.fid}`);
       
+      const data = await res.json();
+
       if (!res.ok) {
-        console.error("API Hatası:", res.status);
+        // API Köstebeğinden gelen gerçek hatayı ekrana basıyoruz
+        console.error("API Hatası Detayı:", data);
+        setErrorMessage(data.details || "Sunucu hatası oluştu.");
         return;
       }
 
-      const data = await res.json();
       setNonFollowers(data.users || []);
       setStats(data.stats || null);
       setIsFollowingDev(data.isFollowingDev); 
       
     } catch (error) {
-      console.error("Veri çekme hatası:", error);
+      console.error("Bağlantı hatası:", error);
+      setErrorMessage("Bağlantı kurulamadı.");
     } finally {
       setLoading(false);
     }
@@ -71,11 +77,15 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
     sdk.actions.viewProfile({ fid: REQUIRED_FOLLOW_FID });
   };
 
-  // GÜVENLİ BAHŞİŞ FONKSİYONU
-  // Cüzdan hatasını önlemek için şimdilik profil linkini açıyoruz.
-  const handleTip = () => {
-    // Profilini açar, oradan bahşiş atabilirler veya iletişime geçerler
+  // --- GÜVENLİ BAHŞİŞ SİSTEMİ (INTENTS) ---
+  // MetaMask hatası vermez. Direkt Warpcast profilini veya Cast ekranını açar.
+  const handleTip = (amount: number) => {
+    // 1. Yöntem: Direkt Profil Açma (En güvenlisi)
+    // Kullanıcı profiline gidip oradan "Send Money" diyebilir.
     sdk.actions.viewProfile({ fid: REQUIRED_FOLLOW_FID });
+    
+    // Alternatif Yöntem: Eğer Warpcast desteklerse direkt "Send" ekranı açılabilir
+    // sdk.actions.openUrl(`https://warpcast.com/~/pay?recipient=bluexir&amount=${amount}`);
   };
 
   const getTipOptions = () => {
@@ -95,10 +105,26 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
     );
   }
 
+  // EĞER HATA VARSA KIRMIZI EKRAN GÖSTER
+  if (errorMessage) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
+        <div className="text-4xl mb-4">⚠️</div>
+        <h3 className="text-red-500 font-bold mb-2">Analysis Failed</h3>
+        <p className="text-gray-400 text-xs font-mono bg-black/30 p-4 rounded-lg border border-red-500/20">
+          {errorMessage}
+        </p>
+        <button onClick={fetchData} className="mt-6 bg-white/10 text-white px-6 py-2 rounded-lg text-sm">
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen pb-12 px-4 pt-6 max-w-md mx-auto relative">
       
-      {/* --- İstatistik Kartı --- */}
+      {/* İstatistik Kartı */}
       <div className="bg-[#1c1f2e]/80 backdrop-blur-md rounded-2xl p-6 mb-8 border border-white/5 shadow-2xl relative z-10">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-white bg-clip-text text-transparent">
@@ -125,7 +151,7 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
         </div>
       </div>
 
-      {/* --- Liste ve KİLİT --- */}
+      {/* Liste ve KİLİT */}
       <div className="mb-10 relative">
         <h3 className="text-sm font-bold text-gray-400 mb-4 flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-red-500"></span>
@@ -205,7 +231,7 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
         )}
       </div>
 
-      {/* --- Bahşiş --- */}
+      {/* --- Bahşiş (GÜVENLİ MOD) --- */}
       <div className="bg-gradient-to-b from-[#252836] to-[#1c1f2e] rounded-2xl p-1 border border-white/10 shadow-lg mt-8">
         <div className="grid grid-cols-3 gap-1 mb-4 bg-black/20 p-1 rounded-xl">
           {(["ETH", "DEGEN", "USDC"] as const).map((curr) => (
@@ -224,12 +250,12 @@ export default function UnfollowManager({ user }: { user: { fid: number } | unde
         </div>
 
         <div className="px-5 pb-5 text-center">
-          <p className="text-gray-400 text-xs mb-4">Support the developer with {currency}</p>
+          <p className="text-gray-400 text-xs mb-4">Go to profile to tip {currency}</p>
           <div className="grid grid-cols-3 gap-3">
             {getTipOptions().map((amount) => (
               <button
                 key={amount}
-                onClick={handleTip} // Artık güvenli fonksiyonu çağırıyor
+                onClick={() => handleTip(amount)}
                 className="bg-white/5 hover:bg-white/10 border border-white/5 py-3 rounded-xl text-sm font-bold text-white transition-all active:scale-95"
               >
                 {amount} {currency === 'ETH' ? '' : currency === 'USDC' ? '$' : ''}
