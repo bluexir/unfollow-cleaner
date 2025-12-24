@@ -1,38 +1,84 @@
 import { NextRequest, NextResponse } from "next/server";
-import { neynarClient } from "@/lib/neynar";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { signer_uuid, target_fids } = body;
+    
+    // Frontend bazen 'targetFid' (tekil) bazen 'target_fids' (çoğul) gönderebilir.
+    // İkisini de kapsayacak şekilde birleştiriyoruz.
+    const targetFid = body.targetFid; // Frontend'den gelen tekli ID
+    const targetFidsInput = body.target_fids; // Veya toplu liste
 
-    if (!signer_uuid || !target_fids || !Array.isArray(target_fids)) {
-      return NextResponse.json(
-        { error: "signer_uuid ve target_fids gerekli" },
-        { status: 400 }
-      );
+    // Hepsini tek bir dizide toplayalım
+    let targets = [];
+    if (Array.isArray(targetFidsInput)) {
+      targets = targetFidsInput;
+    } else if (targetFid) {
+      targets = [targetFid];
     }
 
-    console.log(`🔄 Unfollow başlıyor: ${target_fids.length} kişi`);
+    // --- KRİTİK AYARLAR (Server Side) ---
+    // Signer UUID'yi frontend göndermez, biz buradaki kasadan alırız.
+    const SIGNER_UUID = process.env.NEYNAR_SIGNER_UUID;
+    const API_KEY = process.env.NEYNAR_API_KEY;
+
+    if (!SIGNER_UUID) {
+      console.error("❌ HATA: Server tarafında NEYNAR_SIGNER_UUID bulunamadı.");
+      return NextResponse.json({ error: "Server Configuration Error" }, { status: 500 });
+    }
+
+    if (targets.length === 0) {
+      return NextResponse.json({ error: "Silinecek FID bulunamadı" }, { status: 400 });
+    }
+
+    console.log(`🔄 Unfollow Başlıyor. Hedef Sayısı: ${targets.length}`);
+    console.log(`🔑 Kullanılan Signer: ${SIGNER_UUID.slice(0, 5)}...`);
 
     const results = [];
     const errors = [];
 
-    // Her FID için unfollow (rate limiting için gecikme ekle)
-    for (const targetFid of target_fids) {
+    // --- DÖNGÜ BAŞLIYOR ---
+    for (const fid of targets) {
       try {
-        await neynarClient.unfollowUser(signer_uuid, targetFid);
-        results.push({ fid: targetFid, success: true });
+        // Neynar v2 API - Delete Follow
+        const url = "https://api.neynar.com/v2/farcaster/user/follow";
         
-        // Rate limiting için küçük bekleme (100ms)
-        await new Promise(resolve => setTimeout(resolve, 100));
-      } catch (error: any) {
-        console.error(`❌ Unfollow hatası (FID: ${targetFid}):`, error.message);
-        errors.push({ fid: targetFid, error: error.message });
+        const options = {
+          method: "DELETE",
+          headers: {
+            "accept": "application/json",
+            "api_key": API_KEY || "",
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({
+            signer_uuid: SIGNER_UUID,
+            target_fid: parseInt(fid) // Sayıya çevirip gönderelim
+          })
+        };
+
+        const res = await fetch(url, options);
+        const responseText = await res.text();
+
+        if (!res.ok) {
+          console.error(`❌ Unfollow Başarısız (FID: ${fid}):`, responseText);
+          errors.push({ fid, error: responseText });
+        } else {
+          console.log(`✅ Unfollow Başarılı (FID: ${fid})`);
+          results.push({ fid, success: true });
+        }
+
+        // Çok hızlı istek atıp banlanmamak için minik bekleme (150ms)
+        if (targets.length > 1) {
+            await new Promise(resolve => setTimeout(resolve, 150));
+        }
+
+      } catch (err: any) {
+        console.error(`🔥 Beklenmedik Hata (FID: ${fid}):`, err.message);
+        errors.push({ fid, error: err.message });
       }
     }
 
-    console.log(`✅ Unfollow tamamlandı: ${results.length} başarılı, ${errors.length} hata`);
+    console.log(`🏁 İşlem Bitti: ${results.length} Silindi, ${errors.length} Hata.`);
 
     return NextResponse.json({
       success: true,
@@ -41,9 +87,9 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error("🔥 Unfollow API hatası:", error.message);
+    console.error("🔥 API Genel Hatası:", error.message);
     return NextResponse.json(
-      { error: error.message || "Unfollow işlemi başarısız" },
+      { error: error.message || "İşlem başarısız" },
       { status: 500 }
     );
   }
