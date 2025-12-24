@@ -3,11 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 // --- AYARLAR ---
 const REQUIRED_FOLLOW_FID = 429973; // Bluexir
 
-// Test için API Anahtarını doğrudan buraya yazdık. 
-// Çalıştığını gördükten sonra Vercel ayarlarına geri dönebiliriz.
-const NEYNAR_API_KEY = "018A8963-2A8F-4ADD-92C7-C3CFD7C511D3";
+// 🔥 YENİ VE TEMİZ ANAHTAR (Kodun içine gömüldü)
+const NEYNAR_API_KEY = "9AE8AC85-3A93-4D79-ABAF-7AB279758724";
 
-// Yardımcı Fonksiyon: Neynar'a Direkt İstek Atar (SDK Kullanmadan)
+// Yardımcı Fonksiyon: Neynar'a Direkt İstek
 async function fetchNeynar(endpoint: string, params: string) {
   const url = `https://api.neynar.com/v2/farcaster/${endpoint}?${params}`;
   
@@ -17,12 +16,11 @@ async function fetchNeynar(endpoint: string, params: string) {
       "accept": "application/json",
       "api_key": NEYNAR_API_KEY,
     },
-    cache: "no-store", // Her zaman taze veri çek
+    cache: "no-store", 
   });
 
   if (!res.ok) {
     const errorBody = await res.text();
-    // Hatayı detaylı görelim
     throw new Error(`Neynar API Hatası (${res.status}): ${errorBody}`);
   }
 
@@ -30,7 +28,7 @@ async function fetchNeynar(endpoint: string, params: string) {
 }
 
 export async function GET(req: NextRequest) {
-  console.log("🟢 (Direct-Mode) API İsteği Başladı...");
+  console.log("🟢 (Safe-Mode) API İsteği Başladı...");
 
   const { searchParams } = new URL(req.url);
   const fid = searchParams.get("fid");
@@ -42,59 +40,66 @@ export async function GET(req: NextRequest) {
   try {
     const userFid = fid; 
 
-    // 1. TAKİP ETTİKLERİNİ ÇEK (Following)
+    // --- 1. TAKİP ETTİKLERİNİ ÇEK (Following) ---
     console.log("📡 Takip edilenler çekiliyor...");
-    let allFollowing: any[] = [];
+    // Map kullanarak aynı kişilerin tekrar eklenmesini %100 engelliyoruz
+    let followingMap = new Map(); 
     let cursor: string | null = "";
     let loop = 0;
 
-    // Güvenlik limiti: Max 15 sayfa
-    while (cursor !== null && loop < 15) {
+    while (cursor !== null && loop < 20) { 
       const params = `fid=${userFid}&limit=100${cursor ? `&cursor=${cursor}` : ""}`;
       const data = await fetchNeynar("following", params);
       
       const users = data.users || [];
-      allFollowing = [...allFollowing, ...users];
+      users.forEach((u: any) => followingMap.set(u.fid, u)); // Varsa üstüne yazar, çift olmaz
       
       cursor = data.next?.cursor || null;
       loop++;
     }
+    // Map'ten temiz listeyi oluştur
+    const allFollowing = Array.from(followingMap.values());
 
-    // 2. SENİ TAKİP EDENLERİ ÇEK (Followers)
-    console.log(`📡 Seni takip edenler çekiliyor... (Şu an bulunan takip edilen: ${allFollowing.length})`);
-    let allFollowers: any[] = [];
-    cursor = "";
+
+    // --- 2. SENİ TAKİP EDENLERİ ÇEK (Followers) ---
+    console.log(`📡 Seni takip edenler çekiliyor...`);
+    let followersMap = new Map(); // Yine Map kullanıyoruz (Süzgeç)
+    cursor = ""; 
     loop = 0;
 
-    while (cursor !== null && loop < 15) {
+    while (cursor !== null && loop < 20) { 
       const params = `fid=${userFid}&limit=100${cursor ? `&cursor=${cursor}` : ""}`;
       const data = await fetchNeynar("followers", params);
 
       const users = data.users || [];
-      allFollowers = [...allFollowers, ...users];
-      
+      users.forEach((u: any) => followersMap.set(u.fid, u)); // Çiftleri eliyoruz
+
       cursor = data.next?.cursor || null;
       loop++;
     }
+    const allFollowers = Array.from(followersMap.values());
 
-    // 3. KARŞILAŞTIRMA
-    console.log("⚡ Analiz yapılıyor...");
+
+    // --- 3. ANALİZ VE SONUÇ ---
+    console.log(`📊 TEMİZ SONUÇLAR: ${allFollowing.length} Takip Edilen, ${allFollowers.length} Takipçi`);
+
+    // Hızlı karşılaştırma için Set kullan
     const followerFids = new Set(allFollowers.map((u: any) => u.fid));
     
-    // Takip ettiklerinden, seni takip etmeyenleri süzüyoruz
+    // Seni takip etmeyenleri bul
     const nonFollowers = allFollowing.filter((u: any) => !followerFids.has(u.fid));
 
-    // Kilit Kontrolü (Geliştiriciyi takip ediyor mu?)
+    // Kilit Kontrolü
     const isFollowingDev = allFollowing.some((u: any) => u.fid === REQUIRED_FOLLOW_FID);
 
-    console.log(`✅ BİTTİ! Hayalet Sayısı: ${nonFollowers.length}`);
+    console.log(`✅ ANALİZ BİTTİ! Hayalet Sayısı: ${nonFollowers.length}`);
 
     return NextResponse.json({ 
       users: nonFollowers,
       isFollowingDev: isFollowingDev,
       stats: {
         following: allFollowing.length,
-        followers: allFollowers.length,
+        followers: allFollowers.length, // Artık gerçek sayı (78 civarı) gelecek
         notFollowingBack: nonFollowers.length
       }
     });
