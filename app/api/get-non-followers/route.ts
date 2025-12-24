@@ -9,7 +9,6 @@ export async function GET(req: NextRequest) {
   const fid = searchParams.get("fid");
   
   const API_KEY = process.env.NEYNAR_API_KEY;
-  // const SIGNER_UUID = process.env.NEYNAR_SIGNER_UUID; // Okuma işlemi için şart değil ama varsa iyi olur
 
   if (!fid) {
     return NextResponse.json({ error: "FID gerekli" }, { status: 400 });
@@ -22,7 +21,7 @@ export async function GET(req: NextRequest) {
   const fidNumber = parseInt(fid);
 
   try {
-    console.log(`🚀 [STRICT-MODE] Analiz Başlıyor - FID: ${fidNumber}`);
+    console.log(`🚀 [SUPER-STRICT-MODE] Analiz Başlıyor - FID: ${fidNumber}`);
 
     const headers = {
       "accept": "application/json",
@@ -54,6 +53,7 @@ export async function GET(req: NextRequest) {
       users.forEach((item: any) => {
         const user = item.user || item; 
         if (user && user.fid) {
+          // Takip ettiklerini olduğu gibi al, filtreleme
           followingMap.set(user.fid, {
             fid: user.fid,
             username: user.username,
@@ -72,14 +72,14 @@ export async function GET(req: NextRequest) {
 
     console.log(`✅ [FOLLOWING] Bitti. Toplam: ${followingMap.size} kişi`);
 
-    // 2️⃣ FOLLOWERS (Seni Takip Edenler - FİLTRELİ)
+    // 2️⃣ FOLLOWERS (Seni Takip Edenler - AGRESİF FİLTRELİ)
     const followersSet = new Set<number>();
     let followersCursor = "";
     let followersLoop = 0;
     let totalRawFollowers = 0;
     let ignoredBots = 0;
 
-    console.log("📡 [FOLLOWERS] İstek ve FİLTRELEME başlıyor...");
+    console.log("📡 [FOLLOWERS] İstek ve AGRESİF FİLTRELEME başlıyor...");
 
     do {
       let url = `https://api.neynar.com/v2/farcaster/followers?fid=${fidNumber}&limit=100`;
@@ -98,18 +98,30 @@ export async function GET(req: NextRequest) {
         const user = item.user || item;
         if (user && user.fid) {
           
-          // --- SPAM / GHOST FİLTRESİ ---
-          // Warpcast'in gizlediği hesapları biz de gizliyoruz.
-          // Kriter: Power Badge yoksa VE (Resmi yoksa VEYA Takipçi sayısı 2'den azsa) -> BOT SAY
+          // --- SÜPER AGRESİF FİLTRE ---
+          // Warpcast'in gizlediği hesapları "Takipçi" saymamak için kriterler:
+          
           const hasPowerBadge = user.power_badge === true;
           const hasPfp = user.pfp_url && user.pfp_url.length > 0;
-          const hasFollowers = user.follower_count >= 2; 
+          // Eşik değeri: En az 3 takipçisi olmalı. Yoksa muhtemelen spam bottur.
+          const hasDecentFollowers = user.follower_count >= 3; 
+          
+          let isQualityUser = false;
 
-          // Eğer kaliteli bir hesap değilse, takipçi setine EKLEME!
-          // Yani: PowerBadge yoksa... VE (Resmi yok YA DA Takipçisi çok azsa)
-          if (!hasPowerBadge && (!hasPfp || !hasFollowers)) {
+          if (hasPowerBadge) {
+            // Rozeti varsa her türlü geçerlidir.
+            isQualityUser = true;
+          } else {
+            // Rozeti yoksa: Hem resmi olacak HEM DE en az 3 takipçisi olacak.
+            if (hasPfp && hasDecentFollowers) {
+                isQualityUser = true;
+            }
+          }
+
+          if (!isQualityUser) {
              ignoredBots++;
-             // Bu kişiyi sete eklemiyoruz, yani seni takip etmiyor sayıyoruz.
+             // Bu kişiyi sete EKLEMİYORUZ. 
+             // Böylece sistem "Bu kişi seni takip etmiyor" sanacak ve Ghost listesine düşecek.
              return; 
           }
 
@@ -125,12 +137,12 @@ export async function GET(req: NextRequest) {
     console.log(`✅ [FOLLOWERS] Bitti.`);
     console.log(`   📊 API'den Gelen Ham Veri: ${totalRawFollowers}`);
     console.log(`   🗑️ Çöp Sayılıp Atılan: ${ignoredBots}`);
-    console.log(`   💎 Geçerli Takipçi Sayın: ${followersSet.size}`);
+    console.log(`   💎 Geçerli (Kaliteli) Takipçi Sayın: ${followersSet.size}`);
 
     // 3️⃣ ANALİZ (GHOST TESPİTİ)
     const followingList = Array.from(followingMap.values());
     
-    // Ghost Mantığı: Ben takip ediyorum (Listede var) AMA O beni geçerli şekilde takip etmiyor (Set içinde yok)
+    // Ghost Mantığı: Ben takip ediyorum (Listede var) AMA O beni GEÇERLİ şekilde takip etmiyor (Set içinde yok)
     const nonFollowers = followingList.filter(
       (user) => !followersSet.has(user.fid)
     );
@@ -138,7 +150,7 @@ export async function GET(req: NextRequest) {
     console.log(`🎯 [SONUÇ] Ghost Sayısı: ${nonFollowers.length}`);
 
     // Admin (Senin) Kontrolü
-    const isFollowingDev = followersSet.has(429973); // 429973 senin ID'n ise
+    const isFollowingDev = followersSet.has(429973); 
 
     return NextResponse.json({
       nonFollowers: nonFollowers,
@@ -146,8 +158,8 @@ export async function GET(req: NextRequest) {
       isFollowingDev: isFollowingDev, 
       stats: {
         following: followingMap.size,
-        followers: followersSet.size, // Artık filtrelenmiş sayı görünecek (80'e yakın)
-        raw_followers: totalRawFollowers, // Merak edersen diye API verisi
+        followers: followersSet.size, // Artık filtrelenmiş sayı görünecek (80'e yakın olmalı)
+        raw_followers: totalRawFollowers,
         ghosts: nonFollowers.length
       },
     });
