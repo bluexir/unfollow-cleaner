@@ -4,10 +4,9 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     
-    // Frontend bazen 'targetFid' (tekil) bazen 'target_fids' (çoğul) gönderebilir.
-    // İkisini de kapsayacak şekilde birleştiriyoruz.
-    const targetFid = body.targetFid; // Frontend'den gelen tekli ID
-    const targetFidsInput = body.target_fids; // Veya toplu liste
+    // Frontend'den gelen veriyi alıyoruz
+    const targetFid = body.targetFid; 
+    const targetFidsInput = body.target_fids; 
 
     // Hepsini tek bir dizide toplayalım
     let targets = [];
@@ -17,8 +16,7 @@ export async function POST(req: NextRequest) {
       targets = [targetFid];
     }
 
-    // --- KRİTİK AYARLAR (Server Side) ---
-    // Signer UUID'yi frontend göndermez, biz buradaki kasadan alırız.
+    // --- SERVER AYARLARI ---
     const SIGNER_UUID = process.env.NEYNAR_SIGNER_UUID;
     const API_KEY = process.env.NEYNAR_API_KEY;
 
@@ -47,29 +45,39 @@ export async function POST(req: NextRequest) {
           method: "DELETE",
           headers: {
             "accept": "application/json",
-            "api_key": API_KEY || "",
+            "api_key": API_KEY || "", // Eski header
+            "x-api-key": API_KEY || "", // Yeni header (Garanti olsun)
             "content-type": "application/json"
           },
+          // İŞTE DÜZELTİLEN KISIM BURASI:
           body: JSON.stringify({
             signer_uuid: SIGNER_UUID,
-            target_fid: parseInt(fid) // Sayıya çevirip gönderelim
+            target_fids: [parseInt(fid)] // <--- target_fid YERİNE target_fids (LİSTE HALİNDE)
           })
         };
 
         const res = await fetch(url, options);
         const responseText = await res.text();
 
+        // Neynar bazen boş body döndürür başarılı olunca, o yüzden status check önemli
         if (!res.ok) {
-          console.error(`❌ Unfollow Başarısız (FID: ${fid}):`, responseText);
-          errors.push({ fid, error: responseText });
+            // Hata mesajını parse edelim
+            let errorMsg = responseText;
+            try {
+                const jsonErr = JSON.parse(responseText);
+                errorMsg = jsonErr.message || responseText;
+            } catch (e) {}
+
+            console.error(`❌ Unfollow Başarısız (FID: ${fid}):`, errorMsg);
+            errors.push({ fid, error: errorMsg });
         } else {
-          console.log(`✅ Unfollow Başarılı (FID: ${fid})`);
-          results.push({ fid, success: true });
+            console.log(`✅ Unfollow Başarılı (FID: ${fid})`);
+            results.push({ fid, success: true });
         }
 
-        // Çok hızlı istek atıp banlanmamak için minik bekleme (150ms)
+        // Rate limit önlemi (Hızlı istek atıp banlanmamak için)
         if (targets.length > 1) {
-            await new Promise(resolve => setTimeout(resolve, 150));
+            await new Promise(resolve => setTimeout(resolve, 200));
         }
 
       } catch (err: any) {
