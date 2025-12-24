@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// --- CACHE İPTAL (Her zaman taze veri) ---
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
@@ -20,14 +21,16 @@ export async function GET(req: NextRequest) {
   const fidNumber = parseInt(fid);
 
   try {
-    console.log(`🚀 [START] Analiz başlıyor - FID: ${fidNumber}`);
+    console.log(`🚀 [FIXED-VERSION] Analiz Başlıyor - FID: ${fidNumber}`);
 
+    // GARANTİ HEADERS: Hem eski hem yeni standardı destekler
     const headers = {
       "accept": "application/json",
       "api_key": API_KEY,
+      "x-api-key": API_KEY 
     };
 
-    // 1️⃣ FOLLOWINGS
+    // 1️⃣ FOLLOWINGS (Takip Ettiklerin)
     const followingMap = new Map();
     let followingCursor = "";
     let followingLoop = 0;
@@ -51,9 +54,9 @@ export async function GET(req: NextRequest) {
 
       console.log(`   ✅ [FOLLOWING] Loop ${followingLoop + 1} - ${users.length} kişi geldi`);
 
-      // ✅ DÜZELTİLDİ: item.user kullan!
       users.forEach((item: any) => {
-        const user = item.user; // ← Önce user objesini al
+        // Neynar v2 yapısına göre kontrol
+        const user = item.user || item; 
         if (user && user.fid) {
           followingMap.set(user.fid, {
             fid: user.fid,
@@ -65,17 +68,15 @@ export async function GET(req: NextRequest) {
         }
       });
 
-      console.log(`   📊 Map size şu anda: ${followingMap.size}`);
-
       followingCursor = data.next?.cursor || "";
       followingLoop++;
 
       if (followingLoop >= 50) break;
     } while (followingCursor);
 
-    console.log(`✅ [FOLLOWING] TAMAMLANDI - Toplam: ${followingMap.size} kişi, Loop: ${followingLoop}`);
+    console.log(`✅ [FOLLOWING] TAMAMLANDI - Toplam: ${followingMap.size} kişi`);
 
-    // 2️⃣ FOLLOWERS
+    // 2️⃣ FOLLOWERS (Seni Takip Edenler)
     const followersSet = new Set<number>();
     let followersCursor = "";
     let followersLoop = 0;
@@ -99,15 +100,12 @@ export async function GET(req: NextRequest) {
 
       console.log(`   ✅ [FOLLOWERS] Loop ${followersLoop + 1} - ${users.length} kişi geldi`);
 
-      // ✅ DÜZELTİLDİ: item.user kullan!
       users.forEach((item: any) => {
-        const user = item.user; // ← Önce user objesini al
+        const user = item.user || item;
         if (user && user.fid) {
           followersSet.add(user.fid);
         }
       });
-
-      console.log(`   📊 Set size şu anda: ${followersSet.size}`);
 
       followersCursor = data.next?.cursor || "";
       followersLoop++;
@@ -115,23 +113,30 @@ export async function GET(req: NextRequest) {
       if (followersLoop >= 50) break;
     } while (followersCursor);
 
-    console.log(`✅ [FOLLOWERS] TAMAMLANDI - Toplam: ${followersSet.size} kişi, Loop: ${followersLoop}`);
+    console.log(`✅ [FOLLOWERS] TAMAMLANDI - Toplam: ${followersSet.size} kişi`);
 
-    // 3️⃣ ANALİZ
+    // 3️⃣ ANALİZ (GHOST TESPİTİ)
     const followingList = Array.from(followingMap.values());
+    
+    // Ghost: Ben takip ediyorum (followingList içinde var) AMA o beni takip etmiyor (followersSet içinde yok)
     const nonFollowers = followingList.filter(
       (user) => !followersSet.has(user.fid)
     );
 
-    console.log(`🎯 [SONUÇ] Non-followers: ${nonFollowers.length} kişi`);
-    console.log(`📊 [STATS] Following: ${followingMap.size}, Followers: ${followersSet.size}`);
+    console.log(`🎯 [SONUÇ] Non-followers (Ghosts): ${nonFollowers.length} kişi`);
 
+    // --- KRİTİK DÜZELTME KISMI ---
+    // Frontend muhtemelen 'users' arıyor veya 'stats.ghosts' bekliyor.
+    // Her ihtimali kapsayacak şekilde hepsini gönderiyoruz.
+    
     return NextResponse.json({
-      nonFollowers: nonFollowers,
+      nonFollowers: nonFollowers, // Yeni frontend yapısı için
+      users: nonFollowers,        // Eski/Olası frontend yapısı için (Yedek)
       stats: {
         following: followingMap.size,
         followers: followersSet.size,
         nonFollowersCount: nonFollowers.length,
+        ghosts: nonFollowers.length // Frontend bunu arıyor olabilir
       },
     });
 
