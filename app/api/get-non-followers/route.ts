@@ -25,15 +25,14 @@ export async function GET(req: NextRequest) {
     console.log("📡 Following listesi çekiliyor (SDK)...");
 
     do {
-      const result = await neynarClient.fetchUserFollowing(
-        fidNumber,
-        {
-          limit: 100,
-          cursor: followingCursor,
-        }
-      );
+      const result = await neynarClient.fetchUserFollowing({
+        fid: fidNumber,
+        limit: 100,
+        cursor: followingCursor,
+      });
 
-      result.users.forEach((user) => {
+      // ✅ result.result.users kullan
+      result.result.users.forEach((user) => {
         followingMap.set(user.fid, {
           fid: user.fid,
           username: user.username,
@@ -43,10 +42,11 @@ export async function GET(req: NextRequest) {
         });
       });
 
-      followingCursor = result.next?.cursor;
+      // ✅ result.result.next kullan
+      followingCursor = result.result.next?.cursor;
       followingLoop++;
 
-      if (followingLoop >= 50) break; // Güvenlik
+      if (followingLoop >= 50) break; // Güvenlik limiti
     } while (followingCursor);
 
     console.log(`✅ Following tamamlandı: ${followingMap.size} kişi`);
@@ -59,22 +59,22 @@ export async function GET(req: NextRequest) {
     console.log("📡 Followers listesi çekiliyor (SDK)...");
 
     do {
-      const result = await neynarClient.fetchUserFollowers(
-        fidNumber,
-        {
-          limit: 100,
-          cursor: followersCursor,
-        }
-      );
+      const result = await neynarClient.fetchUserFollowers({
+        fid: fidNumber,
+        limit: 100,
+        cursor: followersCursor,
+      });
 
-      result.users.forEach((user) => {
+      // ✅ result.result.users kullan
+      result.result.users.forEach((user) => {
         followersSet.add(user.fid);
       });
 
-      followersCursor = result.next?.cursor;
+      // ✅ result.result.next kullan
+      followersCursor = result.result.next?.cursor;
       followersLoop++;
 
-      if (followersLoop >= 50) break; // Güvenlik
+      if (followersLoop >= 50) break; // Güvenlik limiti
     } while (followersCursor);
 
     console.log(`✅ Followers tamamlandı: ${followersSet.size} kişi`);
@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
     console.log(`🎯 Sonuç: ${nonFollowers.length} kişi seni takip etmiyor`);
 
     return NextResponse.json({
-      nonFollowers: nonFollowers, // ← Frontend'in beklediği property
+      nonFollowers: nonFollowers,
       stats: {
         following: followingMap.size,
         followers: followersSet.size,
