@@ -1,30 +1,68 @@
-"use client";
+'use client';
 
-import { motion } from "framer-motion";
+import { useState, useEffect } from 'react';
 
-export default function FollowGate() {
-  return (
-    <div className="w-full h-96 flex flex-col items-center justify-center border-2 border-ink border-dashed bg-ink/5 relative overflow-hidden">
-      
-      {/* Arka plan şeritleri */}
-      <div className="absolute inset-0 opacity-10 pointer-events-none" 
-           style={{ backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 1px, transparent 0, transparent 50%)', backgroundSize: '20px 20px' }} 
-      />
+interface FollowGateProps {
+  userFid: number;
+  onFollowVerified: () => void;
+}
 
-      <motion.div 
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="bg-canvas border-2 border-ink p-8 shadow-hard text-center z-10 max-w-md mx-4"
-      >
-        <div className="text-4xl mb-4">🔒</div>
-        <h2 className="text-2xl font-black uppercase mb-2">Restricted Access</h2>
-        <p className="font-mono text-sm text-ink/70 mb-6">
-          System requires authorization to display follower manifest.
-        </p>
-        <div className="inline-block bg-ink text-canvas px-2 py-1 font-mono text-xs">
-          ERROR_CODE: AUTH_REQUIRED
-        </div>
-      </motion.div>
-    </div>
-  );
+export default function FollowGate({ userFid, onFollowVerified }: FollowGateProps) {
+  const [isFollowing, setIsFollowing] = useState<boolean | null>(null);
+  const [isChecking, setIsChecking] = useState(true);
+
+  useEffect(() => {
+    const checkFollow = async () => {
+      // Geliştirici FID kontrolü (Bypass)
+      if (userFid === 429973) {
+        onFollowVerified();
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/check-follow?fid=${userFid}`);
+        const data = await response.json();
+        
+        if (data.isFollowing) {
+          onFollowVerified();
+        } else {
+          setIsFollowing(false);
+        }
+      } catch (error) {
+        console.error('Follow check error:', error);
+        setIsFollowing(false);
+      } finally {
+        setIsChecking(false);
+      }
+    };
+
+    checkFollow();
+  }, [userFid, onFollowVerified]);
+
+  if (isChecking) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-farcaster-purple"></div>
+      </div>
+    );
+  }
+
+  if (isFollowing === false) {
+    return (
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center">
+        <h2 className="text-2xl font-bold mb-4">Follow Required</h2>
+        <p className="text-gray-400 mb-6">To use this app please follow bluexir on Farcaster</p>
+        <a 
+          href="https://warpcast.com/bluexir" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="inline-block bg-farcaster-purple hover:bg-purple-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors duration-200"
+        >
+          Follow bluexir
+        </a>
+      </div>
+    );
+  }
+
+  return null;
 }
