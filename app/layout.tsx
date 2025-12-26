@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import { Inter, Space_Grotesk } from "next/font/google"; // Space Grotesk Swiss stiline çok uyar
+import { Inter } from "next/font/google";
 import "./globals.css";
+import { Providers } from "./providers";
 
-const sans = Space_Grotesk({ subsets: ["latin"], variable: "--font-geist-sans" });
-const mono = { variable: "--font-geist-mono" }; // Mono font fallback kullanıyoruz hata olmasın diye
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Unfollow Cleaner | Swiss Kinetic",
-  description: "Clean your Farcaster feed with precision.",
+  title: "Unfollow Cleaner",
+  description: "Farcaster Takipçi Temizleme Aracı",
 };
 
 export default function RootLayout({
@@ -17,8 +17,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${sans.variable} font-sans bg-canvas text-ink antialiased`}>
-        {children}
+      <body className={inter.className}>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
