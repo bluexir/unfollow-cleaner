@@ -1,0 +1,30 @@
+"use client";
+
+import { motion } from "framer-motion";
+
+export default function FollowGate() {
+  return (
+    <div className="w-full h-96 flex flex-col items-center justify-center border-2 border-ink border-dashed bg-ink/5 relative overflow-hidden">
+      
+      {/* Arka plan şeritleri */}
+      <div className="absolute inset-0 opacity-10 pointer-events-none" 
+           style={{ backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 1px, transparent 0, transparent 50%)', backgroundSize: '20px 20px' }} 
+      />
+
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-canvas border-2 border-ink p-8 shadow-hard text-center z-10 max-w-md mx-4"
+      >
+        <div className="text-4xl mb-4">🔒</div>
+        <h2 className="text-2xl font-black uppercase mb-2">Restricted Access</h2>
+        <p className="font-mono text-sm text-ink/70 mb-6">
+          System requires authorization to display follower manifest.
+        </p>
+        <div className="inline-block bg-ink text-canvas px-2 py-1 font-mono text-xs">
+          ERROR_CODE: AUTH_REQUIRED
+        </div>
+      </motion.div>
+    </div>
+  );
+}
