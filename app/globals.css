@@ -2,33 +2,54 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Farcaster Dark Theme Variables */
 :root {
-  --background: #F2F0ED;
-  --foreground: #111111;
+  --background: #0f1117;
+  --foreground: #ffffff;
+  --primary: #7C65C1; /* Warpcast Purple */
+  --danger: #EF4444;  /* Unfollow Red */
 }
 
+/* Tüm Sayfa Ayarları */
 body {
+  background-color: var(--background);
   color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-  overflow-x: hidden;
+  font-family: system-ui, -apple-system, sans-serif;
+  
+  /* Mobilde sayfayı aşağı çekince arkada beyazlık görünmesini engeller */
+  overscroll-behavior: none; 
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Scrollbar Gizleme / Özelleştirme */
+/* Kaydırma Çubuğu (Scrollbar) Tasarımı - İnce ve Şık */
 ::-webkit-scrollbar {
-  width: 10px;
-}
-::-webkit-scrollbar-track {
-  background: #F2F0ED;
-  border-left: 2px solid #111;
-}
-::-webkit-scrollbar-thumb {
-  background: #111;
-  border: 2px solid #F2F0ED;
+  width: 6px;
 }
 
-/* Custom Utilities */
-.text-stroke {
-  -webkit-text-stroke: 1px #111;
-  color: transparent;
+::-webkit-scrollbar-track {
+  background: #151722; 
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333; 
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary); 
+}
+
+/* Yükleme Animasyonu (Loading Spinner) */
+.loader {
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-left-color: var(--primary);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
