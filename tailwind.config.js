@@ -13,10 +13,6 @@ const config: Config = {
         'farcaster-dark': '#1A1A2E',
         'farcaster-darker': '#0F0F1E',
       },
-      backgroundImage: {
-        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gradient-conic': 'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
-      },
     },
   },
   plugins: [],
