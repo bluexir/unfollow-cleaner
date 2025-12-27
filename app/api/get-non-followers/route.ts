@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
       "x-neynar-experimental": "true",
     };
 
-    // 1️⃣ FOLLOWINGS (Takip Ettiklerin)
+    // 1️⃣ FOLLOWINGS
     const followingMap = new Map();
     let followingCursor = "";
     let followingLoop = 0;
@@ -73,16 +73,16 @@ export async function GET(req: NextRequest) {
 
     console.log(`✅ [FOLLOWING] Toplam: ${followingMap.size} kişi`);
 
-    // 2️⃣ FOLLOWERS (Seni Takip Edenler) - RELEVANT ENDPOINT!
+    // 2️⃣ FOLLOWERS - Relevant endpoint (viewer_fid YOK)
     const followersSet = new Set<number>();
     let followersCursor = "";
     let followersLoop = 0;
 
-    console.log("📡 [FOLLOWERS] Relevant endpoint kullanılıyor...");
+    console.log("📡 [FOLLOWERS] Relevant endpoint (viewer_fid olmadan)...");
 
     do {
-      // ✅ RELEVANT ENDPOINT (target_fid + viewer_fid)
-      let url = `https://api.neynar.com/v2/farcaster/followers/relevant?target_fid=${fidNumber}&viewer_fid=${fidNumber}&limit=100`;
+      // ✅ Sadece target_fid (viewer_fid yok!)
+      let url = `https://api.neynar.com/v2/farcaster/followers/relevant?target_fid=${fidNumber}&limit=100`;
       if (followersCursor) url += `&cursor=${followersCursor}`;
 
       const res = await fetch(url, { headers });
@@ -109,7 +109,7 @@ export async function GET(req: NextRequest) {
       if (followersLoop >= 50) break;
     } while (followersCursor);
 
-    console.log(`✅ [FOLLOWERS] Toplam (filtreli): ${followersSet.size} kişi`);
+    console.log(`✅ [FOLLOWERS] Toplam (relevant): ${followersSet.size} kişi`);
 
     // 3️⃣ ANALİZ
     const followingList = Array.from(followingMap.values());
