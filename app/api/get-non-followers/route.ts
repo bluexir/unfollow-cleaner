@@ -22,10 +22,11 @@ export async function GET(req: NextRequest) {
   try {
     console.log(`🚀 [START] Analiz başlıyor - FID: ${fidNumber}`);
 
+    // ✅ SPAM FİLTER: x-neynar-experimental: true
     const headers = {
       "accept": "application/json",
       "api_key": API_KEY,
-      "x-neynar-experimental": "true",
+      "x-neynar-experimental": "true", // ← Bu header spam filtreler!
     };
 
     // 1️⃣ FOLLOWINGS
@@ -73,19 +74,19 @@ export async function GET(req: NextRequest) {
 
     console.log(`✅ [FOLLOWING] Toplam: ${followingMap.size} kişi`);
 
-    // 2️⃣ FOLLOWERS - Relevant endpoint (viewer_fid YOK)
+    // 2️⃣ FOLLOWERS - NORMAL endpoint + experimental header
     const followersSet = new Set<number>();
     let followersCursor = "";
     let followersLoop = 0;
 
-    console.log("📡 [FOLLOWERS] Relevant endpoint (viewer_fid olmadan)...");
+    console.log("📡 [FOLLOWERS] Normal endpoint + spam filter...");
 
     do {
-      // ✅ Sadece target_fid (viewer_fid yok!)
-      let url = `https://api.neynar.com/v2/farcaster/followers/relevant?target_fid=${fidNumber}&limit=100`;
+      // ✅ NORMAL ENDPOINT (experimental header filtreyi aktif eder)
+      let url = `https://api.neynar.com/v2/farcaster/followers?fid=${fidNumber}&limit=100`;
       if (followersCursor) url += `&cursor=${followersCursor}`;
 
-      const res = await fetch(url, { headers });
+      const res = await fetch(url, { headers }); // ← Header'da x-neynar-experimental: true var
       
       if (!res.ok) {
         const errorText = await res.text();
@@ -109,7 +110,7 @@ export async function GET(req: NextRequest) {
       if (followersLoop >= 50) break;
     } while (followersCursor);
 
-    console.log(`✅ [FOLLOWERS] Toplam (relevant): ${followersSet.size} kişi`);
+    console.log(`✅ [FOLLOWERS] Toplam (spam filtreli): ${followersSet.size} kişi`);
 
     // 3️⃣ ANALİZ
     const followingList = Array.from(followingMap.values());
@@ -136,3 +137,14 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+```
+
+---
+
+## ✅ **NE YAPIYORUZ:**
+```
+NORMAL endpoint: /v2/farcaster/followers?fid=X
++ 
+HEADER: x-neynar-experimental: true
+= 
+Spam filtreli takipçiler!
