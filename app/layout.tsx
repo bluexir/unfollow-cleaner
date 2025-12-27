@@ -17,7 +17,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      {/* Tasarımın tam siyah olması için buraya stil ekledik */}
+      <body className={`${inter.className} bg-black text-white min-h-screen`}>
         <Providers>{children}</Providers>
       </body>
     </html>
