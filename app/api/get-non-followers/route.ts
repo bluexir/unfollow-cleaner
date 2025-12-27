@@ -1,4 +1,3 @@
-```typescript
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = 'force-dynamic';
@@ -29,7 +28,6 @@ export async function GET(req: NextRequest) {
       "x-neynar-experimental": "true",
     };
 
-    // 1️⃣ FOLLOWINGS
     const followingMap = new Map();
     let followingCursor = "";
     let followingLoop = 0;
@@ -74,7 +72,6 @@ export async function GET(req: NextRequest) {
 
     console.log(`✅ [FOLLOWING] Toplam: ${followingMap.size} kişi`);
 
-    // 2️⃣ FOLLOWERS
     const followersSet = new Set<number>();
     let followersCursor = "";
     let followersLoop = 0;
@@ -111,7 +108,6 @@ export async function GET(req: NextRequest) {
 
     console.log(`✅ [FOLLOWERS] Toplam (spam filtreli): ${followersSet.size} kişi`);
 
-    // 3️⃣ ANALİZ
     const followingList = Array.from(followingMap.values());
     const nonFollowers = followingList.filter(
       (user) => !followersSet.has(user.fid)
