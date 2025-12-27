@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import ShareCastPopup from './ShareCastPopup';
+import ShareCastPopup from './ShareCastPopup'; // Mevcut paylaşım popup'ını koruyoruz
 
 interface NonFollower {
   fid: number;
@@ -9,6 +9,7 @@ interface NonFollower {
   display_name: string;
   pfp_url: string;
   follower_count: number;
+  power_badge: boolean;
 }
 
 interface NonFollowersListProps {
@@ -17,19 +18,25 @@ interface NonFollowersListProps {
 }
 
 export default function NonFollowersList({ userFid, signerUuid }: NonFollowersListProps) {
+  // --- STATE YÖNETİMİ ---
   const [nonFollowers, setNonFollowers] = useState<NonFollower[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isUnfollowing, setIsUnfollowing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showSharePopup, setShowSharePopup] = useState(false);
-  const [unfollowCount, setUnfollowCount] = useState(0);
+  
+  // İstatistikler (Doğru veriler buraya gelecek)
   const [stats, setStats] = useState<{
     following: number;
     followers: number;
     nonFollowersCount: number;
   } | null>(null);
 
+  // Canlı Sayaç (Session Counter)
+  const [sessionCount, setSessionCount] = useState(0);
+  const [showSharePopup, setShowSharePopup] = useState(false);
+
+  // --- VERİ ÇEKME (FETCH) ---
   useEffect(() => {
     fetchNonFollowers();
   }, [userFid]);
@@ -39,6 +46,7 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
     setError(null);
 
     try {
+      // Backend artık 'Relevant' (Doğru) veriyi döndürüyor
       const response = await fetch(`/api/get-non-followers?fid=${userFid}`);
       const data = await response.json();
 
@@ -46,7 +54,7 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
         throw new Error(data.error);
       }
 
-      // Follower sayısına göre sırala (az olanlar üstte)
+      // Listeyi follower sayısına göre sırala (Az takipçili spamlar üste)
       const sorted = data.nonFollowers.sort((a: NonFollower, b: NonFollower) => 
         a.follower_count - b.follower_count
       );
@@ -59,12 +67,13 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
       }
 
     } catch (error: any) {
-      setError(error.message || 'Non-followers yüklenemedi');
+      setError(error.message || 'Liste yüklenirken hata oluştu.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  // --- SEÇİM MANTIKLARI ---
   const toggleSelectAll = () => {
     if (selectedUsers.size === nonFollowers.length) {
       setSelectedUsers(new Set());
@@ -83,6 +92,7 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
     setSelectedUsers(newSelected);
   };
 
+  // --- UNFOLLOW İŞLEMİ ---
   const handleUnfollow = async () => {
     if (selectedUsers.size === 0) return;
 
@@ -92,9 +102,7 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
     try {
       const response = await fetch('/api/unfollow', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           signer_uuid: signerUuid,
           target_fids: Array.from(selectedUsers),
@@ -103,27 +111,27 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
 
       const data = await response.json();
 
-      if (data.error) {
-        throw new Error(data.error);
-      }
+      if (data.error) throw new Error(data.error);
 
-      setUnfollowCount(selectedUsers.size);
-      
-      // Listeden çıkar
+      const count = selectedUsers.size;
+
+      // 1. Listeden sil
       const remaining = nonFollowers.filter(u => !selectedUsers.has(u.fid));
       setNonFollowers(remaining);
-      setSelectedUsers(new Set());
       
-      // İstatistikleri güncelle
+      // 2. İstatistikleri güncelle (Client-side)
       if (stats) {
         setStats({
           ...stats,
-          following: stats.following - selectedUsers.size,
-          nonFollowersCount: remaining.length,
+          following: stats.following - count,
+          nonFollowersCount: remaining.length
         });
       }
-      
-      setShowSharePopup(true);
+
+      // 3. SEÇİMİ SIFIRLA VE SAYAÇ ARTIR
+      setSelectedUsers(new Set());
+      setSessionCount(prev => prev + count);
+
     } catch (error: any) {
       setError(error.message || 'Unfollow işlemi başarısız');
     } finally {
@@ -131,137 +139,201 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
     }
   };
 
+  // --- RENDER ---
+
+  // Yükleniyor Ekranı (Minimalist)
   if (isLoading) {
     return (
-      <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-farcaster-purple mx-auto mb-4"></div>
-        <p className="text-gray-400">Non-followers analiz ediliyor...</p>
+      <div className="flex flex-col items-center justify-center py-20 space-y-4">
+        <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+        <p className="text-sm font-mono text-gray-400 animate-pulse">VERİ ANALİZ EDİLİYOR...</p>
       </div>
     );
   }
 
+  // Hata Ekranı
   if (error) {
     return (
-      <div className="bg-red-900/50 border border-red-700 text-red-200 px-6 py-4 rounded-lg">
-        <p className="font-bold mb-2">❌ Hata</p>
-        <p>{error}</p>
-      </div>
-    );
-  }
-
-  if (nonFollowers.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <h3 className="text-2xl font-bold mb-2">Hepsi Temiz! 🎉</h3>
-        <p className="text-gray-400">
-          Takip ettiğin herkes seni de takip ediyor
-        </p>
-        {stats && (
-          <div className="mt-6 text-sm text-gray-500">
-            <p>Takip Ettiğin: {stats.following}</p>
-            <p>Takipçi: {stats.followers}</p>
-          </div>
-        )}
+      <div className="bg-red-500/10 border border-red-500/50 p-6 rounded-lg text-center backdrop-blur-sm">
+        <p className="text-red-400 font-mono mb-2">SYSTEM ERROR</p>
+        <p className="text-white">{error}</p>
+        <button 
+          onClick={fetchNonFollowers}
+          className="mt-4 px-4 py-2 bg-red-600/20 hover:bg-red-600/40 text-red-200 rounded border border-red-500/30 transition-all"
+        >
+          Tekrar Dene
+        </button>
       </div>
     );
   }
 
   return (
-    <>
-      <div className="mb-8">
-        {/* İstatistikler */}
-        {stats && (
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="bg-farcaster-dark border border-gray-700 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-farcaster-purple">{stats.following}</p>
-              <p className="text-sm text-gray-400">Takip Ettiğin</p>
+    <div className="space-y-8 relative min-h-screen pb-24">
+      
+      {/* 1. İSTATİSTİK KARTLARI (SWISS GRID) */}
+      {stats && (
+        <div className="grid grid-cols-3 gap-px bg-gray-800/50 border border-gray-800 rounded-xl overflow-hidden backdrop-blur-md">
+          
+          {/* Following */}
+          <div className="bg-black/80 p-6 flex flex-col items-center justify-center hover:bg-white/5 transition-colors">
+            <span className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-1">FOLLOWING</span>
+            <span className="text-2xl font-bold text-white font-mono">{stats.following}</span>
+          </div>
+
+          {/* Followers (Artık Doğru Sayı) */}
+          <div className="bg-black/80 p-6 flex flex-col items-center justify-center hover:bg-white/5 transition-colors">
+            <span className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-1">FOLLOWERS</span>
+            <span className="text-2xl font-bold text-green-400 font-mono">{stats.followers}</span>
+          </div>
+
+          {/* Ghosts (Hedef Kitle) */}
+          <div className="bg-black/80 p-6 flex flex-col items-center justify-center relative overflow-hidden group">
+            <div className="absolute inset-0 bg-red-900/20 group-hover:bg-red-900/30 transition-colors"></div>
+            <span className="text-xs font-mono text-red-400 uppercase tracking-widest mb-1 z-10">GHOSTS</span>
+            <span className="text-3xl font-bold text-red-500 font-mono z-10">{stats.nonFollowersCount}</span>
+          </div>
+        </div>
+      )}
+
+      {/* 2. LİSTE BAŞLIĞI VE AKSİYONLAR */}
+      {nonFollowers.length > 0 ? (
+        <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4 border-b border-gray-800 pb-4">
+          <div>
+            <h2 className="text-xl font-bold text-white">Tespit Edilen Hesaplar</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Bu kişiler seni takip etmiyor (veya spam filtresine takıldı).
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 cursor-pointer group">
+              <div className={`w-5 h-5 border rounded flex items-center justify-center transition-colors ${
+                selectedUsers.size === nonFollowers.length 
+                  ? 'bg-white border-white' 
+                  : 'border-gray-600 group-hover:border-gray-400'
+              }`}>
+                {selectedUsers.size === nonFollowers.length && (
+                  <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>
+                )}
+              </div>
+              <input 
+                type="checkbox" 
+                className="hidden" 
+                onChange={toggleSelectAll} 
+                checked={selectedUsers.size === nonFollowers.length}
+              />
+              <span className="text-sm font-medium text-gray-400 group-hover:text-white transition-colors">Tümünü Seç</span>
+            </label>
+
+            {selectedUsers.size > 0 && (
+              <button
+                onClick={handleUnfollow}
+                disabled={isUnfollowing}
+                className="bg-red-600 hover:bg-red-500 disabled:bg-gray-800 disabled:text-gray-500 text-white font-bold py-2 px-6 rounded-lg shadow-[0_0_20px_rgba(220,38,38,0.3)] hover:shadow-[0_0_30px_rgba(220,38,38,0.5)] transition-all duration-300 transform active:scale-95 flex items-center gap-2"
+              >
+                {isUnfollowing ? (
+                  <span className="animate-pulse">TEMİZLENİYOR...</span>
+                ) : (
+                  <>
+                    <span>TEMİZLE</span>
+                    <span className="bg-black/20 px-2 py-0.5 rounded text-sm">{selectedUsers.size}</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        // Liste Boşsa (Tertemiz)
+        <div className="text-center py-24 bg-gray-900/30 rounded-2xl border border-gray-800 border-dashed">
+          <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 className="text-2xl font-bold text-white mb-2">Her Şey Tertemiz!</h3>
+          <p className="text-gray-400">Takip ettiğin herkes seni geri takip ediyor.</p>
+        </div>
+      )}
+
+      {/* 3. KULLANICI LİSTESİ (KARTLAR) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {nonFollowers.map((user) => (
+          <div 
+            key={user.fid}
+            onClick={() => toggleUser(user.fid)}
+            className={`group relative p-4 rounded-xl border transition-all duration-200 cursor-pointer flex items-center gap-4 ${
+              selectedUsers.has(user.fid)
+                ? 'bg-red-900/10 border-red-500/50'
+                : 'bg-black/40 border-gray-800 hover:border-gray-600 hover:bg-white/5'
+            }`}
+          >
+            {/* Checkbox Indicator */}
+            <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 transition-colors ${
+              selectedUsers.has(user.fid) ? 'bg-red-500 border-red-500' : 'border-gray-600 bg-transparent'
+            }`}>
+              {selectedUsers.has(user.fid) && (
+                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>
+              )}
             </div>
-            <div className="bg-farcaster-dark border border-gray-700 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-green-500">{stats.followers}</p>
-              <p className="text-sm text-gray-400">Takipçi</p>
+
+            {/* Avatar */}
+            <img 
+              src={user.pfp_url || 'https://warpcast.com/avatar.png'} 
+              alt={user.username}
+              className="w-12 h-12 rounded-lg object-cover bg-gray-800"
+            />
+
+            {/* User Info */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-white truncate">{user.display_name}</span>
+                {user.power_badge && (
+                  <span className="text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded border border-purple-500/30">⚡️</span>
+                )}
+              </div>
+              <div className="text-sm text-gray-500 truncate font-mono">@{user.username}</div>
             </div>
-            <div className="bg-farcaster-dark border border-gray-700 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-red-500">{stats.nonFollowersCount}</p>
-              <p className="text-sm text-gray-400">Takip Etmiyor</p>
+
+            {/* Stats Tag */}
+            <div className="text-right">
+              <div className="text-xs text-gray-500 uppercase">Takipçi</div>
+              <div className="text-sm font-mono text-gray-300">{user.follower_count.toLocaleString()}</div>
             </div>
           </div>
-        )}
-
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold">
-            Seni Takip Etmeyenler ({nonFollowers.length})
-          </h2>
-          {selectedUsers.size > 0 && (
-            <button
-              onClick={handleUnfollow}
-              disabled={isUnfollowing}
-              className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg transition-all duration-200"
-            >
-              {isUnfollowing ? 'Unfollowing...' : `Unfollow (${selectedUsers.size})`}
-            </button>
-          )}
-        </div>
-
-        <div className="bg-blue-900/30 border border-blue-700/50 rounded-lg p-4 mb-6">
-          <p className="text-sm text-blue-200">
-            💡 Spam kısıtlamalarından kaçınmak için 5-10 kişiyi bir seferde unfollow edin
-          </p>
-        </div>
-
-        <div className="bg-farcaster-dark border border-gray-700 rounded-lg p-4 mb-4">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={selectedUsers.size === nonFollowers.length}
-              onChange={toggleSelectAll}
-              className="w-5 h-5 rounded border-gray-600 text-farcaster-purple focus:ring-farcaster-purple"
-            />
-            <span className="font-medium">Hepsini Seç</span>
-          </label>
-        </div>
-
-        <div className="space-y-3">
-          {nonFollowers.map((user) => (
-            <div
-              key={user.fid}
-              className="bg-farcaster-dark border border-gray-700 rounded-lg p-4 hover:border-gray-600 transition-colors duration-200"
-            >
-              <label className="flex items-center gap-4 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectedUsers.has(user.fid)}
-                  onChange={() => toggleUser(user.fid)}
-                  className="w-5 h-5 rounded border-gray-600 text-farcaster-purple focus:ring-farcaster-purple"
-                />
-                <img
-                  src={user.pfp_url || '/default-avatar.png'}
-                  alt={user.username}
-                  className="w-12 h-12 rounded-full"
-                />
-                <div className="flex-1">
-                  <div className="font-medium">{user.display_name}</div>
-                  <div className="text-sm text-gray-400">@{user.username}</div>
-                </div>
-                <div className="text-sm text-gray-500">
-                  {user.follower_count.toLocaleString()} takipçi
-                </div>
-              </label>
-            </div>
-          ))}
-        </div>
+        ))}
       </div>
 
+      {/* 4. CANLI SAYAÇ (SESSION COUNTER) - SWISS KINETIC BAR */}
+      {sessionCount > 0 && (
+        <div className="fixed bottom-6 right-6 z-50 animate-bounce-in">
+          <div className="bg-black border border-gray-700 shadow-2xl rounded-full pl-6 pr-2 py-2 flex items-center gap-6">
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Bu Oturumda</span>
+              <span className="text-sm text-white font-mono">
+                <span className="text-red-500 font-bold text-lg">{sessionCount}</span> KİŞİ SİLİNDİ
+              </span>
+            </div>
+            
+            <button 
+              onClick={() => setShowSharePopup(true)}
+              className="bg-white text-black hover:bg-gray-200 font-bold py-2 px-6 rounded-full text-sm transition-colors flex items-center gap-2"
+            >
+              <span>PAYLAŞ</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Paylaşım Popup'ı */}
       {showSharePopup && (
-        <ShareCastPopup
-          unfollowCount={unfollowCount}
-          onClose={() => setShowSharePopup(false)}
+        <ShareCastPopup 
+          unfollowCount={sessionCount} 
+          onClose={() => setShowSharePopup(false)} 
         />
       )}
-    </>
+
+    </div>
   );
 }
