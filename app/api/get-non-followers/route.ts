@@ -1,3 +1,14 @@
+## ✅ **NE YAPIYORUZ:**
+```
+NORMAL endpoint: /v2/farcaster/followers?fid=X
+```
+
+Bunlar **açıklama**, **kod değil!** TypeScript derleyemedi!
+
+---
+
+## 📁 **SADECE KOD KISMI (TEMİZ):**
+```typescript
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = 'force-dynamic';
@@ -22,11 +33,10 @@ export async function GET(req: NextRequest) {
   try {
     console.log(`🚀 [START] Analiz başlıyor - FID: ${fidNumber}`);
 
-    // ✅ SPAM FİLTER: x-neynar-experimental: true
     const headers = {
       "accept": "application/json",
       "api_key": API_KEY,
-      "x-neynar-experimental": "true", // ← Bu header spam filtreler!
+      "x-neynar-experimental": "true",
     };
 
     // 1️⃣ FOLLOWINGS
@@ -74,7 +84,7 @@ export async function GET(req: NextRequest) {
 
     console.log(`✅ [FOLLOWING] Toplam: ${followingMap.size} kişi`);
 
-    // 2️⃣ FOLLOWERS - NORMAL endpoint + experimental header
+    // 2️⃣ FOLLOWERS
     const followersSet = new Set<number>();
     let followersCursor = "";
     let followersLoop = 0;
@@ -82,11 +92,10 @@ export async function GET(req: NextRequest) {
     console.log("📡 [FOLLOWERS] Normal endpoint + spam filter...");
 
     do {
-      // ✅ NORMAL ENDPOINT (experimental header filtreyi aktif eder)
       let url = `https://api.neynar.com/v2/farcaster/followers?fid=${fidNumber}&limit=100`;
       if (followersCursor) url += `&cursor=${followersCursor}`;
 
-      const res = await fetch(url, { headers }); // ← Header'da x-neynar-experimental: true var
+      const res = await fetch(url, { headers });
       
       if (!res.ok) {
         const errorText = await res.text();
@@ -137,14 +146,3 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-```
-
----
-
-## ✅ **NE YAPIYORUZ:**
-```
-NORMAL endpoint: /v2/farcaster/followers?fid=X
-+ 
-HEADER: x-neynar-experimental: true
-= 
-Spam filtreli takipçiler!
