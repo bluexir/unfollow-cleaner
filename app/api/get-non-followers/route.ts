@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// --- CACHE İPTAL (Her zaman taze veri) ---
+// --- ÖNEMLİ: Cache (Önbellek) İptali ---
+// Farcaster dinamik bir yer, verinin her zaman taze olması lazım.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
@@ -10,6 +11,7 @@ export async function GET(req: NextRequest) {
   
   const API_KEY = process.env.NEYNAR_API_KEY;
 
+  // Temel güvenlik kontrolleri
   if (!fid) {
     return NextResponse.json({ error: "FID gerekli" }, { status: 400 });
   }
@@ -21,7 +23,7 @@ export async function GET(req: NextRequest) {
   const fidNumber = parseInt(fid);
 
   try {
-    console.log(`🚀 [SUPER-STRICT-MODE] Analiz Başlıyor - FID: ${fidNumber}`);
+    console.log(`🚀 [ANALİZ BAŞLIYOR] FID: ${fidNumber}`);
 
     const headers = {
       "accept": "application/json",
@@ -29,12 +31,13 @@ export async function GET(req: NextRequest) {
       "x-api-key": API_KEY 
     };
 
-    // 1️⃣ FOLLOWINGS (Senin Takip Ettiklerin - Hepsini alıyoruz)
+    // ---------------------------------------------------------
+    // 1️⃣ SENİN TAKİP ETTİKLERİN (Following) - FİLTRESİZ
+    // ---------------------------------------------------------
+    // Burası değişmedi. Senin kimi takip ettiğini eksiksiz öğreniyoruz.
     const followingMap = new Map();
     let followingCursor = "";
-    let followingLoop = 0;
-
-    console.log("📡 [FOLLOWING] İstek başlıyor...");
+    let safeLoopFollowing = 0; 
 
     do {
       let url = `https://api.neynar.com/v2/farcaster/following?fid=${fidNumber}&limit=100`;
@@ -43,7 +46,7 @@ export async function GET(req: NextRequest) {
       const res = await fetch(url, { headers });
       
       if (!res.ok) {
-        console.error(`❌ [FOLLOWING] API Hatası:`, await res.text());
+        console.error("API Hatası (Following):", await res.text());
         break;
       }
 
@@ -53,121 +56,103 @@ export async function GET(req: NextRequest) {
       users.forEach((item: any) => {
         const user = item.user || item; 
         if (user && user.fid) {
-          // Takip ettiklerini olduğu gibi al, filtreleme
           followingMap.set(user.fid, {
             fid: user.fid,
             username: user.username,
             display_name: user.display_name || user.username,
             pfp_url: user.pfp_url,
             follower_count: user.follower_count,
-            power_badge: user.power_badge
+            // Profilde göstermek için ek veriler
+            power_badge: user.power_badge,
+            profile: user.profile
           });
         }
       });
 
       followingCursor = data.next?.cursor || "";
-      followingLoop++;
-      if (followingLoop >= 50) break;
+      safeLoopFollowing++;
+      if (safeLoopFollowing > 50) break; // Sonsuz döngü koruması
+
     } while (followingCursor);
 
-    console.log(`✅ [FOLLOWING] Bitti. Toplam: ${followingMap.size} kişi`);
+    console.log(`✅ [FOLLOWING] Senin Takip Ettiklerin: ${followingMap.size}`);
 
-    // 2️⃣ FOLLOWERS (Seni Takip Edenler - AGRESİF FİLTRELİ)
+
+    // ---------------------------------------------------------
+    // 2️⃣ SENİ TAKİP EDENLER (Followers) - RELEVANT MOD (YENİ)
+    // ---------------------------------------------------------
+    // BURASI KRİTİK DEĞİŞİKLİK!
+    // Artık 'relevant' endpoint kullanıyoruz ve 'viewer_fid' gönderiyoruz.
+    // Bu işlem, Warpcast'teki o "Temiz Liste"yi (109 kişi) getirecek.
+    
     const followersSet = new Set<number>();
     let followersCursor = "";
-    let followersLoop = 0;
-    let totalRawFollowers = 0;
-    let ignoredBots = 0;
+    let safeLoopFollowers = 0;
 
-    console.log("📡 [FOLLOWERS] İstek ve AGRESİF FİLTRELEME başlıyor...");
+    console.log("📡 [FOLLOWERS] Warpcast filtreli (Relevant) liste çekiliyor...");
 
     do {
-      let url = `https://api.neynar.com/v2/farcaster/followers?fid=${fidNumber}&limit=100`;
+      // viewer_fid ekledik: Senin engellediğin veya sessize aldığın kişileri de eler.
+      let url = `https://api.neynar.com/v2/farcaster/followers/relevant?fid=${fidNumber}&viewer_fid=${fidNumber}&limit=100`;
       if (followersCursor) url += `&cursor=${followersCursor}`;
 
       const res = await fetch(url, { headers });
       
-      if (!res.ok) break;
+      if (!res.ok) {
+        console.error("API Hatası (Followers/Relevant):", await res.text());
+        break;
+      }
 
       const data = await res.json();
+      // Relevant endpoint yapısında bazen users dizisi farklı gelebilir, standart kontrol:
       const users = data.users || [];
       
-      totalRawFollowers += users.length;
-
       users.forEach((item: any) => {
         const user = item.user || item;
         if (user && user.fid) {
-          
-          // --- SÜPER AGRESİF FİLTRE ---
-          // Warpcast'in gizlediği hesapları "Takipçi" saymamak için kriterler:
-          
-          const hasPowerBadge = user.power_badge === true;
-          const hasPfp = user.pfp_url && user.pfp_url.length > 0;
-          // Eşik değeri: En az 3 takipçisi olmalı. Yoksa muhtemelen spam bottur.
-          const hasDecentFollowers = user.follower_count >= 3; 
-          
-          let isQualityUser = false;
-
-          if (hasPowerBadge) {
-            // Rozeti varsa her türlü geçerlidir.
-            isQualityUser = true;
-          } else {
-            // Rozeti yoksa: Hem resmi olacak HEM DE en az 3 takipçisi olacak.
-            if (hasPfp && hasDecentFollowers) {
-                isQualityUser = true;
-            }
-          }
-
-          if (!isQualityUser) {
-             ignoredBots++;
-             // Bu kişiyi sete EKLEMİYORUZ. 
-             // Böylece sistem "Bu kişi seni takip etmiyor" sanacak ve Ghost listesine düşecek.
-             return; 
-          }
-
           followersSet.add(user.fid);
         }
       });
 
       followersCursor = data.next?.cursor || "";
-      followersLoop++;
-      if (followersLoop >= 50) break;
+      safeLoopFollowers++;
+      if (safeLoopFollowers > 50) break;
+
     } while (followersCursor);
 
-    console.log(`✅ [FOLLOWERS] Bitti.`);
-    console.log(`   📊 API'den Gelen Ham Veri: ${totalRawFollowers}`);
-    console.log(`   🗑️ Çöp Sayılıp Atılan: ${ignoredBots}`);
-    console.log(`   💎 Geçerli (Kaliteli) Takipçi Sayın: ${followersSet.size}`);
+    console.log(`✅ [FOLLOWERS] Filtreli Takipçi Sayısı: ${followersSet.size}`);
 
-    // 3️⃣ ANALİZ (GHOST TESPİTİ)
+
+    // ---------------------------------------------------------
+    // 3️⃣ KARŞILAŞTIRMA VE GHOST TESPİTİ
+    // ---------------------------------------------------------
     const followingList = Array.from(followingMap.values());
     
-    // Ghost Mantığı: Ben takip ediyorum (Listede var) AMA O beni GEÇERLİ şekilde takip etmiyor (Set içinde yok)
+    // FORMÜL: Takip Ettiklerim (Listesi) İÇİNDEKİ kişi -> Takipçilerim (Seti) içinde YOKSA -> GHOSTTUR
     const nonFollowers = followingList.filter(
       (user) => !followersSet.has(user.fid)
     );
 
     console.log(`🎯 [SONUÇ] Ghost Sayısı: ${nonFollowers.length}`);
 
-    // Admin (Senin) Kontrolü
+    // Admin (Senin) Kontrolün
     const isFollowingDev = followersSet.has(429973); 
 
     return NextResponse.json({
       nonFollowers: nonFollowers,
-      users: nonFollowers, 
+      users: nonFollowers, // Frontend uyumluluğu için
       isFollowingDev: isFollowingDev, 
       stats: {
-        following: followingMap.size,
-        followers: followersSet.size, // Artık filtrelenmiş sayı görünecek (80'e yakın olmalı)
-        raw_followers: totalRawFollowers,
-        ghosts: nonFollowers.length
+        following: followingMap.size,    // Örn: 203
+        followers: followersSet.size,    // Örn: 109 (Temizlenmiş)
+        nonFollowersCount: nonFollowers.length // Örn: ~94 (Yakalananlar)
       },
     });
 
   } catch (error: any) {
-    console.error("🔥 [ERROR] HATA:", error.message);
+    console.error("🔥 [ERROR] Kritik Hata:", error.message);
     return NextResponse.json(
-      { error: error.message || "Bir hata oluştu" },
+      { error: error.message || "Sunucu hatası oluştu" },
       { status: 500 }
     );
   }
