@@ -1,13 +1,3 @@
-## ✅ **NE YAPIYORUZ:**
-```
-NORMAL endpoint: /v2/farcaster/followers?fid=X
-```
-
-Bunlar **açıklama**, **kod değil!** TypeScript derleyemedi!
-
----
-
-## 📁 **SADECE KOD KISMI (TEMİZ):**
 ```typescript
 import { NextRequest, NextResponse } from "next/server";
 
