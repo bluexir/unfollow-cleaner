@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import ShareCastPopup from './ShareCastPopup'; // Mevcut paylaşım popup'ını koruyoruz
+import ShareCastPopup from './ShareCastPopup';
+import TipSection from './TipSection'; // <--- YENİ EKLENDİ
 
 interface NonFollower {
   fid: number;
@@ -25,18 +26,18 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
   const [isUnfollowing, setIsUnfollowing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // İstatistikler (Doğru veriler buraya gelecek)
+  // İstatistikler
   const [stats, setStats] = useState<{
     following: number;
     followers: number;
     nonFollowersCount: number;
   } | null>(null);
 
-  // Canlı Sayaç (Session Counter)
+  // Canlı Sayaç
   const [sessionCount, setSessionCount] = useState(0);
   const [showSharePopup, setShowSharePopup] = useState(false);
 
-  // --- VERİ ÇEKME (FETCH) ---
+  // --- VERİ ÇEKME ---
   useEffect(() => {
     fetchNonFollowers();
   }, [userFid]);
@@ -46,7 +47,6 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
     setError(null);
 
     try {
-      // Backend artık 'Relevant' (Doğru) veriyi döndürüyor
       const response = await fetch(`/api/get-non-followers?fid=${userFid}`);
       const data = await response.json();
 
@@ -54,14 +54,13 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
         throw new Error(data.error);
       }
 
-      // Listeyi follower sayısına göre sırala (Az takipçili spamlar üste)
+      // Listeyi sırala
       const sorted = data.nonFollowers.sort((a: NonFollower, b: NonFollower) => 
         a.follower_count - b.follower_count
       );
 
       setNonFollowers(sorted);
       
-      // İstatistikleri kaydet
       if (data.stats) {
         setStats(data.stats);
       }
@@ -115,11 +114,9 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
 
       const count = selectedUsers.size;
 
-      // 1. Listeden sil
       const remaining = nonFollowers.filter(u => !selectedUsers.has(u.fid));
       setNonFollowers(remaining);
       
-      // 2. İstatistikleri güncelle (Client-side)
       if (stats) {
         setStats({
           ...stats,
@@ -128,7 +125,6 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
         });
       }
 
-      // 3. SEÇİMİ SIFIRLA VE SAYAÇ ARTIR
       setSelectedUsers(new Set());
       setSessionCount(prev => prev + count);
 
@@ -140,8 +136,6 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
   };
 
   // --- RENDER ---
-
-  // Yükleniyor Ekranı (Minimalist)
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 space-y-4">
@@ -151,7 +145,6 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
     );
   }
 
-  // Hata Ekranı
   if (error) {
     return (
       <div className="bg-red-500/10 border border-red-500/50 p-6 rounded-lg text-center backdrop-blur-sm">
@@ -170,23 +163,17 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
   return (
     <div className="space-y-8 relative min-h-screen pb-24">
       
-      {/* 1. İSTATİSTİK KARTLARI (SWISS GRID) */}
+      {/* 1. İSTATİSTİKLER */}
       {stats && (
         <div className="grid grid-cols-3 gap-px bg-gray-800/50 border border-gray-800 rounded-xl overflow-hidden backdrop-blur-md">
-          
-          {/* Following */}
           <div className="bg-black/80 p-6 flex flex-col items-center justify-center hover:bg-white/5 transition-colors">
             <span className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-1">FOLLOWING</span>
             <span className="text-2xl font-bold text-white font-mono">{stats.following}</span>
           </div>
-
-          {/* Followers (Artık Doğru Sayı) */}
           <div className="bg-black/80 p-6 flex flex-col items-center justify-center hover:bg-white/5 transition-colors">
             <span className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-1">FOLLOWERS</span>
             <span className="text-2xl font-bold text-green-400 font-mono">{stats.followers}</span>
           </div>
-
-          {/* Ghosts (Hedef Kitle) */}
           <div className="bg-black/80 p-6 flex flex-col items-center justify-center relative overflow-hidden group">
             <div className="absolute inset-0 bg-red-900/20 group-hover:bg-red-900/30 transition-colors"></div>
             <span className="text-xs font-mono text-red-400 uppercase tracking-widest mb-1 z-10">GHOSTS</span>
@@ -195,7 +182,7 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
         </div>
       )}
 
-      {/* 2. LİSTE BAŞLIĞI VE AKSİYONLAR */}
+      {/* 2. LİSTE BAŞLIĞI */}
       {nonFollowers.length > 0 ? (
         <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4 border-b border-gray-800 pb-4">
           <div>
@@ -244,7 +231,6 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
           </div>
         </div>
       ) : (
-        // Liste Boşsa (Tertemiz)
         <div className="text-center py-24 bg-gray-900/30 rounded-2xl border border-gray-800 border-dashed">
           <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
             <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -256,7 +242,7 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
         </div>
       )}
 
-      {/* 3. KULLANICI LİSTESİ (KARTLAR) */}
+      {/* 3. KULLANICI LİSTESİ */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {nonFollowers.map((user) => (
           <div 
@@ -268,7 +254,6 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
                 : 'bg-black/40 border-gray-800 hover:border-gray-600 hover:bg-white/5'
             }`}
           >
-            {/* Checkbox Indicator */}
             <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 transition-colors ${
               selectedUsers.has(user.fid) ? 'bg-red-500 border-red-500' : 'border-gray-600 bg-transparent'
             }`}>
@@ -277,14 +262,12 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
               )}
             </div>
 
-            {/* Avatar */}
             <img 
               src={user.pfp_url || 'https://warpcast.com/avatar.png'} 
               alt={user.username}
               className="w-12 h-12 rounded-lg object-cover bg-gray-800"
             />
 
-            {/* User Info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-bold text-white truncate">{user.display_name}</span>
@@ -295,7 +278,6 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
               <div className="text-sm text-gray-500 truncate font-mono">@{user.username}</div>
             </div>
 
-            {/* Stats Tag */}
             <div className="text-right">
               <div className="text-xs text-gray-500 uppercase">Takipçi</div>
               <div className="text-sm font-mono text-gray-300">{user.follower_count.toLocaleString()}</div>
@@ -304,7 +286,10 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
         ))}
       </div>
 
-      {/* 4. CANLI SAYAÇ (SESSION COUNTER) - SWISS KINETIC BAR */}
+      {/* 4. BAHŞİŞ TERMİNALİ (BURADA GÖRÜNECEK) */}
+      <TipSection />
+
+      {/* 5. CANLI SAYAÇ */}
       {sessionCount > 0 && (
         <div className="fixed bottom-6 right-6 z-50 animate-bounce-in">
           <div className="bg-black border border-gray-700 shadow-2xl rounded-full pl-6 pr-2 py-2 flex items-center gap-6">
@@ -326,7 +311,6 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
         </div>
       )}
 
-      {/* Paylaşım Popup'ı */}
       {showSharePopup && (
         <ShareCastPopup 
           unfollowCount={sessionCount} 
