@@ -3,7 +3,6 @@
 import { useEffect, useState, createContext, useContext } from "react";
 import sdk from "@farcaster/frame-sdk";
 
-// Farcaster Context Type
 type FrameContext = Awaited<typeof sdk.context>;
 
 const FarcasterContext = createContext<{ context: FrameContext | undefined }>({
@@ -18,7 +17,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       try {
         const frameContext = await sdk.context;
         setContext(frameContext);
-        sdk.actions.ready();
+        sdk.actions.ready(); // ← BU SATIR OLMALI!
       } catch (error) {
         console.error("SDK Yükleme Hatası:", error);
       }
