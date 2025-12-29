@@ -13,19 +13,18 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const signer = await neynarClient.lookupSigner({ signerUuid });
+    // DÜZELTME: { signerUuid } yerine doğrudan signerUuid yazıldı.
+    const signer = await neynarClient.lookupSigner(signerUuid);
 
-    // Frontend'in polling'ine uyumlu tek format
     return NextResponse.json({
       status: signer.status, // pending | approved | revoked
       fid: signer.fid ?? null,
       signer_uuid: signer.signer_uuid,
     });
   } catch (error: any) {
-    // Invalid/expired signer durumunda SDK throw edebiliyor.
-    // Bu durumda 500 dönmek polling'i sonsuz retry'ya sokuyor.
     console.error("Signer kontrol hatası:", error);
 
+    // Hata durumunda (404 vs) polling'i durdurmak için not_found dönüyoruz
     return NextResponse.json(
       {
         status: 'not_found',
