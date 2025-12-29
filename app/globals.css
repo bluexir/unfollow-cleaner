@@ -8,6 +8,10 @@
   --foreground: #ffffff;
   --primary: #7C65C1; /* Warpcast Purple */
   --danger: #EF4444;  /* Unfollow Red */
+
+  /* Premium glow helpers (Yeni Eklenenler) */
+  --glow-purple: 124, 101, 193;
+  --glow-red: 239, 68, 68;
 }
 
 /* Tüm Sayfa Ayarları */
@@ -52,4 +56,24 @@ body {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* --- YENİ EKLENEN ANİMASYON VE ARKA PLANLAR --- */
+
+/* Subtle app background glow */
+.bg-app {
+  background:
+    radial-gradient(900px circle at 15% 10%, rgba(var(--glow-purple), 0.10), transparent 55%),
+    radial-gradient(700px circle at 85% 30%, rgba(var(--glow-red), 0.06), transparent 60%),
+    linear-gradient(180deg, #0f1117 0%, #0b0d12 100%);
+}
+
+/* Motion-safe entrance animation */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-up {
+  animation: fadeUp 280ms ease-out both;
 }
