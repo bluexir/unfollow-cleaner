@@ -11,6 +11,7 @@ interface NonFollower {
   pfp_url: string;
   follower_count: number;
   power_badge: boolean;
+  neynar_score: number | null; // SCORE EKLENDİ
 }
 
 interface NonFollowersListProps {
@@ -36,6 +37,21 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
   // Canlı Sayaç
   const [sessionCount, setSessionCount] = useState(0);
   const [showSharePopup, setShowSharePopup] = useState(false);
+
+  // SCORE RENK MANTIKLARI
+  const getScoreColor = (score: number | null) => {
+    if (score === null) return "text-gray-500";
+    if (score >= 0.8) return "text-green-400";
+    if (score >= 0.55) return "text-yellow-400";
+    return "text-red-400";
+  };
+
+  const getScoreBadge = (score: number | null) => {
+    if (score === null) return "N/A";
+    if (score >= 0.8) return "⭐";
+    if (score >= 0.55) return "✓";
+    return "⚠️";
+  };
 
   // --- VERİ ÇEKME ---
   useEffect(() => {
@@ -282,9 +298,21 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
               <div className="text-sm text-gray-500 truncate font-mono">@{user.username}</div>
             </div>
 
-            <div className="text-right">
-              <div className="text-xs text-gray-500 uppercase">Takipçi</div>
-              <div className="text-sm font-mono text-gray-300">{user.follower_count.toLocaleString()}</div>
+            <div className="text-right space-y-1">
+              {/* NEYNAR SCORE */}
+              {user.neynar_score !== null && (
+                <div className="flex items-center gap-1 justify-end">
+                  <span className="text-xs">{getScoreBadge(user.neynar_score)}</span>
+                  <span className={`text-xs font-bold ${getScoreColor(user.neynar_score)}`}>
+                    {user.neynar_score.toFixed(2)}
+                  </span>
+                </div>
+              )}
+              {/* TAKIPCI SAYISI */}
+              <div>
+                <div className="text-xs text-gray-500 uppercase">Takipçi</div>
+                <div className="text-sm font-mono text-gray-300">{user.follower_count.toLocaleString()}</div>
+              </div>
             </div>
           </div>
         ))}
