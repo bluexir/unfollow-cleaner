@@ -8,11 +8,10 @@ export async function GET(req: NextRequest) {
   const fid = searchParams.get("fid");
   
   const API_KEY = process.env.NEYNAR_API_KEY;
-
+  
   if (!fid) {
     return NextResponse.json({ error: "FID gerekli" }, { status: 400 });
   }
-
   if (!API_KEY) {
     return NextResponse.json({ error: "API Key eksik" }, { status: 500 });
   }
@@ -33,7 +32,6 @@ export async function GET(req: NextRequest) {
     let followingLoop = 0;
 
     console.log("📡 [FOLLOWING] İstek başlıyor...");
-
     do {
       let url = `https://api.neynar.com/v2/farcaster/following?fid=${fidNumber}&limit=100`;
       if (followingCursor) url += `&cursor=${followingCursor}`;
@@ -59,14 +57,14 @@ export async function GET(req: NextRequest) {
             pfp_url: user.pfp_url,
             follower_count: user.follower_count,
             power_badge: user.power_badge,
-            profile: user.profile
+            profile: user.profile,
+            neynar_score: user.experimental?.neynar_user_score ?? null, // SCORE EKLENDİ
           });
         }
       });
 
       followingCursor = data.next?.cursor || "";
       followingLoop++;
-
       if (followingLoop >= 50) break;
     } while (followingCursor);
 
@@ -77,7 +75,6 @@ export async function GET(req: NextRequest) {
     let followersLoop = 0;
 
     console.log("📡 [FOLLOWERS] Normal endpoint + spam filter...");
-
     do {
       let url = `https://api.neynar.com/v2/farcaster/followers?fid=${fidNumber}&limit=100`;
       if (followersCursor) url += `&cursor=${followersCursor}`;
@@ -102,7 +99,6 @@ export async function GET(req: NextRequest) {
 
       followersCursor = data.next?.cursor || "";
       followersLoop++;
-
       if (followersLoop >= 50) break;
     } while (followersCursor);
 
