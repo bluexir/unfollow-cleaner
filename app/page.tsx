@@ -37,7 +37,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[#0f1117]">
+    <main data-testid="app-root" className="min-h-screen bg-app">
       <AppShell user={context.user} />
     </main>
   );
