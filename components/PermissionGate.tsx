@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import sdk from '@farcaster/frame-sdk';
 
 interface PermissionGateProps {
   userFid: number;
@@ -45,8 +46,23 @@ export default function PermissionGate({ userFid, onPermissionGranted }: Permiss
 
       setSignerData({ signer_uuid: data.signer_uuid, deep_link: data.deep_link });
 
-      // Warpcast içinde approval penceresini aç
-      window.open(data.deep_link, '_blank');
+      // Warpcast içinde approval ekranını aç
+      // window.open bazı ortamlarda (özellikle Warpcast mini-app) boş sekme/popup açabilir.
+      // Önce Farcaster SDK navigation dene, fallback olarak window.open.
+      try {
+        // SDK iki kullanım biçimi destekliyor: openUrl('...') ve openUrl({url})
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        await sdk.actions.openUrl({ url: data.deep_link });
+      } catch {
+        try {
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
+          await sdk.actions.openUrl(data.deep_link);
+        } catch {
+          window.open(data.deep_link, '_blank');
+        }
+      }
 
       startPolling(data.signer_uuid);
     } catch (err: any) {
@@ -65,12 +81,19 @@ export default function PermissionGate({ userFid, onPermissionGranted }: Permiss
     intervalRef.current = window.setInterval(async () => {
       try {
         const response = await fetch(`/api/check-signer?signer_uuid=${encodeURIComponent(signerUuid)}`);
-        const data = await response.json();
+        // Hata durumunda boş obje dön
+        const data = await response.json().catch(() => ({}));
 
         if (response.ok && data?.status === 'approved' && data?.fid === userFid) {
           if (intervalRef.current) window.clearInterval(intervalRef.current);
           setIsChecking(false);
           onPermissionGranted(signerUuid);
+          return;
+        }
+
+        // invalid signer => stop polling, show clear message
+        if (response.status === 404 || data?.status === 'not_found') {
+          throw new Error('İzin linki süresi dolmuş görünüyor. Tekrar “İzin Ver” ile yeni link oluştur.');
         }
 
         if (response.ok && data?.status === 'revoked') {
@@ -91,7 +114,7 @@ export default function PermissionGate({ userFid, onPermissionGranted }: Permiss
   };
 
   return (
-    <div className="bg-[#1c1f2e]/80 backdrop-blur-md border border-white/5 rounded-2xl p-6 text-center shadow-2xl">
+    <div data-testid="permission-gate-card" className="bg-[#1c1f2e]/80 backdrop-blur-md border border-white/5 rounded-2xl p-6 text-center shadow-2xl">
       <div className="mb-5">
         <div className="w-16 h-16 bg-purple-500/15 border border-purple-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <span className="text-2xl">🛡️</span>
@@ -105,13 +128,17 @@ export default function PermissionGate({ userFid, onPermissionGranted }: Permiss
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-4">
+        <div
+          data-testid="permission-gate-error"
+          className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-4"
+        >
           <p className="text-red-300 text-sm">{error}</p>
         </div>
       )}
 
       {!signerData && !isCreating && (
         <button
+          data-testid="permission-gate-allow-button"
           onClick={createSigner}
           className="bg-[#7C65C1] hover:bg-[#6952a3] text-white font-bold px-6 py-3 rounded-xl transition-colors"
         >
@@ -132,7 +159,30 @@ export default function PermissionGate({ userFid, onPermissionGranted }: Permiss
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-400"></div>
             <span className="text-gray-300 text-sm font-medium">Onay bekleniyor</span>
           </div>
-          <p className="text-xs text-gray-500">Warpcast açılan pencerede “Approve” de.</p>
+          <p className="text-xs text-gray-500">Warpcast açılan ekranda “Approve” de. Açılmadıysa aşağıdan tekrar dene.</p>
+
+          <button
+            data-testid="permission-gate-open-warpcast-button"
+            onClick={async () => {
+              if (!signerData?.deep_link) return;
+              try {
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                await sdk.actions.openUrl({ url: signerData.deep_link });
+              } catch {
+                try {
+                  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                  // @ts-ignore
+                  await sdk.actions.openUrl(signerData.deep_link);
+                } catch {
+                  window.open(signerData.deep_link, '_blank');
+                }
+              }
+            }}
+            className="mt-3 w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold px-4 py-3 rounded-xl transition-colors"
+          >
+            Warpcast’te Onayla
+          </button>
         </div>
       )}
     </div>
