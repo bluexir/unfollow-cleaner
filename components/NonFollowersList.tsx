@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import ShareCastPopup from './ShareCastPopup';
 import TipSection from './TipSection';
+import PermissionModal from './PermissionModal';
+import sdk from '@farcaster/frame-sdk';
 
 interface NonFollower {
   fid: number;
@@ -11,12 +13,12 @@ interface NonFollower {
   pfp_url: string;
   follower_count: number;
   power_badge: boolean;
-  neynar_score: number | null; // SCORE EKLENDİ
+  neynar_score: number | null;
 }
 
 interface NonFollowersListProps {
   userFid: number;
-  signerUuid: string;
+  signerUuid: string | null; // Artık null olabilir
 }
 
 export default function NonFollowersList({ userFid, signerUuid }: NonFollowersListProps) {
@@ -37,6 +39,13 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
   // Canlı Sayaç
   const [sessionCount, setSessionCount] = useState(0);
   const [showSharePopup, setShowSharePopup] = useState(false);
+
+  // Permission Modal
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{ type: 'unfollow' | 'bulk', fids?: number[] } | null>(null);
+  
+  // Dismissable Banner
+  const [dismissedBanner, setDismissedBanner] = useState(false);
 
   // SCORE RENK MANTIKLARI
   const getScoreColor = (score: number | null) => {
@@ -107,10 +116,48 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
     setSelectedUsers(newSelected);
   };
 
+  // --- PROFİL GÖRÜNTÜLEME ---
+  const handleViewProfile = (username: string, fid: number) => {
+    try {
+      // Mini app içinde SDK kullan
+      if (typeof sdk !== 'undefined' && sdk.actions?.viewProfile) {
+        sdk.actions.viewProfile({ fid });
+      } else {
+        // Fallback: Warpcast'te aç
+        window.open(`https://warpcast.com/${username}`, '_blank');
+      }
+    } catch (error) {
+      // Hata olursa direkt link aç
+      window.open(`https://warpcast.com/${username}`, '_blank');
+    }
+  };
+
   // --- UNFOLLOW İŞLEMİ ---
-  const handleUnfollow = async () => {
+  const handleUnfollowClick = (fid: number) => {
+    if (!signerUuid) {
+      // Signer yok, modal aç
+      setPendingAction({ type: 'unfollow', fids: [fid] });
+      setShowPermissionModal(true);
+    } else {
+      // Direkt unfollow
+      doUnfollow([fid]);
+    }
+  };
+
+  const handleBulkUnfollowClick = () => {
     if (selectedUsers.size === 0) return;
 
+    if (!signerUuid) {
+      // Signer yok, modal aç
+      setPendingAction({ type: 'bulk', fids: Array.from(selectedUsers) });
+      setShowPermissionModal(true);
+    } else {
+      // Direkt unfollow
+      doUnfollow(Array.from(selectedUsers));
+    }
+  };
+
+  const doUnfollow = async (fids: number[]) => {
     setIsUnfollowing(true);
     setError(null);
 
@@ -120,7 +167,7 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           signer_uuid: signerUuid,
-          target_fids: Array.from(selectedUsers),
+          target_fids: fids,
         }),
       });
 
@@ -128,9 +175,9 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
 
       if (data.error) throw new Error(data.error);
 
-      const count = selectedUsers.size;
+      const count = fids.length;
 
-      const remaining = nonFollowers.filter(u => !selectedUsers.has(u.fid));
+      const remaining = nonFollowers.filter(u => !fids.includes(u.fid));
       setNonFollowers(remaining);
       
       if (stats) {
@@ -149,6 +196,16 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
     } finally {
       setIsUnfollowing(false);
     }
+  };
+
+  const handlePermissionGranted = (uuid: string) => {
+    setShowPermissionModal(false);
+    
+    // Permission alındıktan sonra pending action'ı execute et
+    if (pendingAction?.fids) {
+      doUnfollow(pendingAction.fids);
+    }
+    setPendingAction(null);
   };
 
   // --- RENDER ---
@@ -180,6 +237,25 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
   return (
     <div data-testid="nonfollowers-screen" className="space-y-8 relative min-h-screen pb-24 animate-fade-up">
       
+      {/* PERMISSION BANNER */}
+      {!signerUuid && !dismissedBanner && nonFollowers.length > 0 && (
+        <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 flex items-center justify-between backdrop-blur-sm">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">⚡</span>
+            <div>
+              <p className="text-white font-semibold">Tek tuşla temizlemek için izin ver</p>
+              <p className="text-gray-400 text-sm">Veya her kişiye tıklayarak manuel unfollow yap</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setDismissedBanner(true)}
+            className="text-gray-400 hover:text-white text-2xl leading-none px-2"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* 1. İSTATİSTİKLER */}
       {stats && (
         <div className="grid grid-cols-3 gap-px bg-gray-800/50 border border-gray-800 rounded-xl overflow-hidden backdrop-blur-md">
@@ -233,7 +309,7 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
             {selectedUsers.size > 0 && (
               <button
                 data-testid="nonfollowers-unfollow-button"
-                onClick={handleUnfollow}
+                onClick={handleBulkUnfollowClick}
                 disabled={isUnfollowing}
                 className="bg-red-600 hover:bg-red-500 disabled:bg-gray-800 disabled:text-gray-500 text-white font-bold py-2 px-6 rounded-lg shadow-[0_0_20px_rgba(220,38,38,0.3)] hover:shadow-[0_0_30px_rgba(220,38,38,0.5)] transition-all duration-300 transform active:scale-95 flex items-center gap-2"
               >
@@ -267,16 +343,18 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
           <div 
             data-testid={`nonfollowers-user-row-${user.fid}`}
             key={user.fid}
-            onClick={() => toggleUser(user.fid)}
-            className={`group relative p-4 rounded-xl border transition-all duration-200 cursor-pointer flex items-center gap-4 ${
+            className={`group relative p-4 rounded-xl border transition-all duration-200 flex items-center gap-4 ${
               selectedUsers.has(user.fid)
                 ? 'bg-red-900/10 border-red-500/50'
                 : 'bg-black/40 border-gray-800 hover:border-gray-600 hover:bg-white/5'
             }`}
           >
-            <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 transition-colors ${
-              selectedUsers.has(user.fid) ? 'bg-red-500 border-red-500' : 'border-gray-600 bg-transparent'
-            }`}>
+            <div 
+              onClick={() => toggleUser(user.fid)}
+              className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 transition-colors cursor-pointer ${
+                selectedUsers.has(user.fid) ? 'bg-red-500 border-red-500' : 'border-gray-600 bg-transparent'
+              }`}
+            >
               {selectedUsers.has(user.fid) && (
                 <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>
               )}
@@ -296,6 +374,23 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
                 )}
               </div>
               <div className="text-sm text-gray-500 truncate font-mono">@{user.username}</div>
+              
+              {/* BUTONLAR */}
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => handleViewProfile(user.username, user.fid)}
+                  className="text-xs bg-gray-700/50 hover:bg-gray-700 text-gray-300 px-3 py-1 rounded transition-colors"
+                >
+                  👁️ Profil
+                </button>
+                <button
+                  onClick={() => handleUnfollowClick(user.fid)}
+                  disabled={isUnfollowing}
+                  className="text-xs bg-red-600/50 hover:bg-red-600 disabled:bg-gray-800 disabled:text-gray-500 text-white px-3 py-1 rounded transition-colors"
+                >
+                  🗑️ Unfollow
+                </button>
+              </div>
             </div>
 
             <div className="text-right space-y-1">
@@ -344,10 +439,22 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
         </div>
       )}
 
+      {/* POPUPS */}
       {showSharePopup && (
         <ShareCastPopup 
           unfollowCount={sessionCount} 
           onClose={() => setShowSharePopup(false)} 
+        />
+      )}
+
+      {showPermissionModal && (
+        <PermissionModal
+          userFid={userFid}
+          onPermissionGranted={handlePermissionGranted}
+          onClose={() => {
+            setShowPermissionModal(false);
+            setPendingAction(null);
+          }}
         />
       )}
 
