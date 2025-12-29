@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import sdk from '@farcaster/frame-sdk';
-import PermissionGate from './PermissionGate';
 import NonFollowersList from './NonFollowersList';
 
 const DEV_FID = 429973; // @bluexir
@@ -18,7 +17,7 @@ export default function AppShell({ user }: { user: { fid: number } }) {
   const [signerUuid, setSignerUuid] = useState<string | null>(null);
   const [isCheckingSigner, setIsCheckingSigner] = useState(true);
 
-  // localStorage hatasını önlemek için state kullanıyoruz (useMemo yerine)
+  // localStorage hatasını önlemek için state kullanıyoruz
   const [storedSigner, setStoredSigner] = useState<string | null>(null);
   const [signerRestoreAttempted, setSignerRestoreAttempted] = useState(false);
 
@@ -73,7 +72,7 @@ export default function AppShell({ user }: { user: { fid: number } }) {
     };
   }, [userFid]);
 
-  // 2) Signer restore + verify
+  // 2) Signer restore + verify (opsiyonel)
   useEffect(() => {
     let cancelled = false;
 
@@ -83,7 +82,6 @@ export default function AppShell({ user }: { user: { fid: number } }) {
     const verifySigner = async (uuid: string) => {
       try {
         const res = await fetch(`/api/check-signer?signer_uuid=${encodeURIComponent(uuid)}`);
-        // Hata durumunda boş obje dön ki crash olmasın
         const data = await res.json().catch(() => ({}));
 
         // approved + fid match
@@ -118,7 +116,7 @@ export default function AppShell({ user }: { user: { fid: number } }) {
         if (result.ok) {
           setSignerUuid(storedSigner);
         } else {
-          // Eğer signer geçersizse, localStorage'dan sil ki sonsuz döngü olmasın
+          // Eğer signer geçersizse, localStorage'dan sil
           if (typeof window !== 'undefined') {
             window.localStorage.removeItem(SIGNER_STORAGE_KEY);
           }
@@ -134,6 +132,15 @@ export default function AppShell({ user }: { user: { fid: number } }) {
       cancelled = true;
     };
   }, [storedSigner, userFid, signerRestoreAttempted]);
+
+  // Signer granted callback
+  const handleSignerGranted = (uuid: string) => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(SIGNER_STORAGE_KEY, uuid);
+    }
+    setStoredSigner(uuid);
+    setSignerUuid(uuid);
+  };
 
   const openDevProfile = () => {
     try {
@@ -194,31 +201,7 @@ export default function AppShell({ user }: { user: { fid: number } }) {
     );
   }
 
-  // Permission gate (signer)
-  if (!signerUuid) {
-    return (
-      <div data-testid="permission-gate-screen" className="px-4 pt-6 pb-12 max-w-md mx-auto animate-fade-up">
-        <div className="mb-5">
-          <h1 data-testid="permission-gate-title" className="text-2xl font-bold text-white">İzin ver, temizliğe başla</h1>
-          <p className="text-gray-400 text-sm mt-1">
-            Unfollow işlemi için Warpcast içinde bir kere izin vermen gerekiyor.
-          </p>
-        </div>
-
-        <PermissionGate
-          userFid={userFid}
-          onPermissionGranted={(uuid) => {
-            if (typeof window !== 'undefined') {
-              window.localStorage.setItem(SIGNER_STORAGE_KEY, uuid);
-            }
-            setStoredSigner(uuid);
-            setSignerUuid(uuid);
-          }}
-        />
-      </div>
-    );
-  }
-
+  // Main app (signer artık opsiyonel)
   return (
     <div data-testid="app-shell-main" className="px-4 pt-6 max-w-3xl mx-auto animate-fade-up">
       <div className="mb-6">
