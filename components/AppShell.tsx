@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import sdk from '@farcaster/frame-sdk';
 import PermissionGate from './PermissionGate';
 import NonFollowersList from './NonFollowersList';
@@ -18,9 +18,15 @@ export default function AppShell({ user }: { user: { fid: number } }) {
   const [signerUuid, setSignerUuid] = useState<string | null>(null);
   const [isCheckingSigner, setIsCheckingSigner] = useState(true);
 
-  const storedSigner = useMemo(() => {
-    if (typeof window === 'undefined') return null;
-    return window.localStorage.getItem(SIGNER_STORAGE_KEY);
+  // localStorage hatasını önlemek için state kullanıyoruz (useMemo yerine)
+  const [storedSigner, setStoredSigner] = useState<string | null>(null);
+  const [signerRestoreAttempted, setSignerRestoreAttempted] = useState(false);
+
+  // 0) LocalStorage'dan güvenli okuma
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setStoredSigner(window.localStorage.getItem(SIGNER_STORAGE_KEY));
+    setSignerRestoreAttempted(true);
   }, []);
 
   // 1) Follow gate (senin FID bypass)
@@ -71,18 +77,28 @@ export default function AppShell({ user }: { user: { fid: number } }) {
   useEffect(() => {
     let cancelled = false;
 
+    // localStorage okunmadan doğrulama yapma
+    if (!signerRestoreAttempted) return;
+
     const verifySigner = async (uuid: string) => {
       try {
         const res = await fetch(`/api/check-signer?signer_uuid=${encodeURIComponent(uuid)}`);
-        const data = await res.json();
+        // Hata durumunda boş obje dön ki crash olmasın
+        const data = await res.json().catch(() => ({}));
 
         // approved + fid match
         if (res.ok && data?.status === 'approved' && data?.fid === userFid) {
-          return true;
+          return { ok: true as const };
         }
-        return false;
+
+        // Eğer signer bulunamazsa (404) veya geçersizse
+        if (res.status === 404 || data?.status === 'not_found') {
+          return { ok: false as const, reason: 'not_found' as const };
+        }
+
+        return { ok: false as const, reason: 'not_approved' as const };
       } catch {
-        return false;
+        return { ok: false as const, reason: 'network' as const };
       }
     };
 
@@ -97,12 +113,16 @@ export default function AppShell({ user }: { user: { fid: number } }) {
         return;
       }
 
-      const ok = await verifySigner(storedSigner);
+      const result = await verifySigner(storedSigner);
       if (!cancelled) {
-        if (ok) {
+        if (result.ok) {
           setSignerUuid(storedSigner);
         } else {
-          window.localStorage.removeItem(SIGNER_STORAGE_KEY);
+          // Eğer signer geçersizse, localStorage'dan sil ki sonsuz döngü olmasın
+          if (typeof window !== 'undefined') {
+            window.localStorage.removeItem(SIGNER_STORAGE_KEY);
+          }
+          setStoredSigner(null);
           setSignerUuid(null);
         }
         setIsCheckingSigner(false);
@@ -113,7 +133,7 @@ export default function AppShell({ user }: { user: { fid: number } }) {
     return () => {
       cancelled = true;
     };
-  }, [storedSigner, userFid]);
+  }, [storedSigner, userFid, signerRestoreAttempted]);
 
   const openDevProfile = () => {
     try {
@@ -125,7 +145,7 @@ export default function AppShell({ user }: { user: { fid: number } }) {
 
   if (isCheckingFollow || isCheckingSigner) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] px-6">
+      <div data-testid="app-shell-loading" className="flex flex-col items-center justify-center min-h-[70vh] px-6">
         <div className="loader mb-4" />
         <p className="text-gray-500 text-xs tracking-[0.25em] animate-pulse">SECURITY CHECK...</p>
       </div>
@@ -135,7 +155,7 @@ export default function AppShell({ user }: { user: { fid: number } }) {
   // Follow gate
   if (!isFollowingDev) {
     return (
-      <div className="px-4 pt-6 pb-12 max-w-md mx-auto">
+      <div data-testid="follow-gate-screen" className="px-4 pt-6 pb-12 max-w-md mx-auto animate-fade-up">
         <div className="bg-[#1c1f2e]/80 backdrop-blur-md rounded-2xl p-6 border border-white/5 shadow-2xl">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center flex-shrink-0">
@@ -153,12 +173,14 @@ export default function AppShell({ user }: { user: { fid: number } }) {
               )}
               <div className="mt-4 flex flex-col gap-3">
                 <button
+                  data-testid="follow-gate-follow-button"
                   onClick={openDevProfile}
                   className="bg-[#7C65C1] hover:bg-[#6952a3] text-white py-3 px-6 rounded-xl font-bold shadow-lg shadow-purple-900/20 transition-colors active:scale-[0.99]"
                 >
                   @bluexir Takip Et
                 </button>
                 <button
+                  data-testid="follow-gate-refresh-button"
                   onClick={() => window.location.reload()}
                   className="text-xs text-gray-500 hover:text-white underline decoration-dashed"
                 >
@@ -175,9 +197,9 @@ export default function AppShell({ user }: { user: { fid: number } }) {
   // Permission gate (signer)
   if (!signerUuid) {
     return (
-      <div className="px-4 pt-6 pb-12 max-w-md mx-auto">
+      <div data-testid="permission-gate-screen" className="px-4 pt-6 pb-12 max-w-md mx-auto animate-fade-up">
         <div className="mb-5">
-          <h1 className="text-2xl font-bold text-white">İzin ver, temizliğe başla</h1>
+          <h1 data-testid="permission-gate-title" className="text-2xl font-bold text-white">İzin ver, temizliğe başla</h1>
           <p className="text-gray-400 text-sm mt-1">
             Unfollow işlemi için Warpcast içinde bir kere izin vermen gerekiyor.
           </p>
@@ -186,7 +208,10 @@ export default function AppShell({ user }: { user: { fid: number } }) {
         <PermissionGate
           userFid={userFid}
           onPermissionGranted={(uuid) => {
-            window.localStorage.setItem(SIGNER_STORAGE_KEY, uuid);
+            if (typeof window !== 'undefined') {
+              window.localStorage.setItem(SIGNER_STORAGE_KEY, uuid);
+            }
+            setStoredSigner(uuid);
             setSignerUuid(uuid);
           }}
         />
@@ -195,7 +220,7 @@ export default function AppShell({ user }: { user: { fid: number } }) {
   }
 
   return (
-    <div className="px-4 pt-6 max-w-3xl mx-auto">
+    <div data-testid="app-shell-main" className="px-4 pt-6 max-w-3xl mx-auto animate-fade-up">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">Unfollow Cleaner</h1>
         <p className="text-gray-500 text-sm mt-1">Seni takip etmeyenleri bul, seç ve tek tuşla temizle.</p>
