@@ -118,7 +118,7 @@ export default function TipSection() {
   };
 
   return (
-    <div className="border border-white/5 bg-black/40 backdrop-blur-md p-6 mt-12 rounded-2xl">
+    <div data-testid="tip-section" className="border border-white/5 bg-black/40 backdrop-blur-md p-6 mt-12 rounded-2xl">
       <div className="max-w-md mx-auto text-center space-y-5">
         <div>
           <h2 className="text-xl font-bold text-white">Geliştiriciye Tip</h2>
@@ -131,6 +131,7 @@ export default function TipSection() {
           <div className="grid grid-cols-3 gap-1 mb-3 bg-black/40 rounded-xl p-1 border border-white/5">
             {(['ETH', 'DEGEN', 'USDC'] as Currency[]).map((curr) => (
               <button
+                data-testid={`tip-currency-${curr.toLowerCase()}-button`}
                 key={curr}
                 onClick={() => setCurrency(curr)}
                 className={`py-2 text-xs font-bold font-mono rounded-lg transition-colors ${
@@ -145,6 +146,7 @@ export default function TipSection() {
           <div className="grid grid-cols-3 gap-2">
             {presets[currency].map((p, idx) => (
               <button
+                data-testid={`tip-preset-${currency.toLowerCase()}-${idx}-button`}
                 key={idx}
                 onClick={() => sendTip(p.amount)}
                 disabled={status === 'pending'}
