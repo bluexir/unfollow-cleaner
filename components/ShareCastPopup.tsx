@@ -23,7 +23,7 @@ export default function ShareCastPopup({ unfollowCount, onClose }: ShareCastPopu
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+    <div data-testid="sharecast-modal" className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
       <div className="bg-farcaster-dark border border-gray-700 rounded-2xl p-8 max-w-md w-full">
         <div className="text-center mb-6">
           <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -45,13 +45,15 @@ export default function ShareCastPopup({ unfollowCount, onClose }: ShareCastPopu
 
         <div className="flex gap-3">
           <button
+            data-testid="sharecast-share-button"
             onClick={handleShare}
             disabled={isSharing}
-            className="flex-1 bg-farcaster-purple hover:bg-purple-700 disabled:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200"
+            className="flex-1 bg-farcaster-purple hover:brightness-110 disabled:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200"
           >
             {isSharing ? 'Opening...' : 'Share Cast'}
           </button>
           <button
+            data-testid="sharecast-skip-button"
             onClick={onClose}
             className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200"
           >
@@ -62,4 +64,3 @@ export default function ShareCastPopup({ unfollowCount, onClose }: ShareCastPopu
     </div>
   );
 }
-
