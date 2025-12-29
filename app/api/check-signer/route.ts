@@ -22,7 +22,18 @@ export async function GET(req: NextRequest) {
       signer_uuid: signer.signer_uuid,
     });
   } catch (error: any) {
+    // Invalid/expired signer durumunda SDK throw edebiliyor.
+    // Bu durumda 500 dönmek polling'i sonsuz retry'ya sokuyor.
     console.error("Signer kontrol hatası:", error);
-    return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
+
+    return NextResponse.json(
+      {
+        status: 'not_found',
+        fid: null,
+        signer_uuid: signerUuid,
+        error: 'Signer not found or expired',
+      },
+      { status: 404 }
+    );
   }
 }
