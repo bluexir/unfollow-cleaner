@@ -4,6 +4,5 @@ if (!process.env.NEYNAR_API_KEY) {
   throw new Error("NEYNAR_API_KEY ortam değişkeni eksik!");
 }
 
-export const neynarClient = new NeynarAPIClient({
-  apiKey: process.env.NEYNAR_API_KEY,
-});
+// Neynar SDK constructor imzası: new NeynarAPIClient(apiKey, options?)
+export const neynarClient = new NeynarAPIClient(process.env.NEYNAR_API_KEY);
