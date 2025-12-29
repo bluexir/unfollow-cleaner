@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import ShareCastPopup from './ShareCastPopup';
-import TipSection from './TipSection'; // <--- YENİ EKLENDİ
+import TipSection from './TipSection';
 
 interface NonFollower {
   fid: number;
@@ -138,7 +138,7 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
   // --- RENDER ---
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 space-y-4">
+      <div data-testid="nonfollowers-loading" className="flex flex-col items-center justify-center py-20 space-y-4">
         <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
         <p className="text-sm font-mono text-gray-400 animate-pulse">VERİ ANALİZ EDİLİYOR...</p>
       </div>
@@ -147,10 +147,11 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
 
   if (error) {
     return (
-      <div className="bg-red-500/10 border border-red-500/50 p-6 rounded-lg text-center backdrop-blur-sm">
+      <div data-testid="nonfollowers-error" className="bg-red-500/10 border border-red-500/50 p-6 rounded-lg text-center backdrop-blur-sm">
         <p className="text-red-400 font-mono mb-2">SYSTEM ERROR</p>
         <p className="text-white">{error}</p>
         <button 
+          data-testid="nonfollowers-retry-button"
           onClick={fetchNonFollowers}
           className="mt-4 px-4 py-2 bg-red-600/20 hover:bg-red-600/40 text-red-200 rounded border border-red-500/30 transition-all"
         >
@@ -161,7 +162,7 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
   }
 
   return (
-    <div className="space-y-8 relative min-h-screen pb-24">
+    <div data-testid="nonfollowers-screen" className="space-y-8 relative min-h-screen pb-24 animate-fade-up">
       
       {/* 1. İSTATİSTİKLER */}
       {stats && (
@@ -204,6 +205,7 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
                 )}
               </div>
               <input 
+                data-testid="nonfollowers-select-all-checkbox"
                 type="checkbox" 
                 className="hidden" 
                 onChange={toggleSelectAll} 
@@ -214,6 +216,7 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
 
             {selectedUsers.size > 0 && (
               <button
+                data-testid="nonfollowers-unfollow-button"
                 onClick={handleUnfollow}
                 disabled={isUnfollowing}
                 className="bg-red-600 hover:bg-red-500 disabled:bg-gray-800 disabled:text-gray-500 text-white font-bold py-2 px-6 rounded-lg shadow-[0_0_20px_rgba(220,38,38,0.3)] hover:shadow-[0_0_30px_rgba(220,38,38,0.5)] transition-all duration-300 transform active:scale-95 flex items-center gap-2"
@@ -246,6 +249,7 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {nonFollowers.map((user) => (
           <div 
+            data-testid={`nonfollowers-user-row-${user.fid}`}
             key={user.fid}
             onClick={() => toggleUser(user.fid)}
             className={`group relative p-4 rounded-xl border transition-all duration-200 cursor-pointer flex items-center gap-4 ${
@@ -286,7 +290,7 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
         ))}
       </div>
 
-      {/* 4. BAHŞİŞ TERMİNALİ (BURADA GÖRÜNECEK) */}
+      {/* 4. BAHŞİŞ TERMİNALİ */}
       <TipSection />
 
       {/* 5. CANLI SAYAÇ */}
@@ -301,6 +305,7 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
             </div>
             
             <button 
+              data-testid="session-share-button"
               onClick={() => setShowSharePopup(true)}
               className="bg-white text-black hover:bg-gray-200 font-bold py-2 px-6 rounded-full text-sm transition-colors flex items-center gap-2"
             >
