@@ -1,104 +1,90 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    
-    // Frontend'den gelen veriyi alıyoruz
-    const targetFid = body.targetFid; 
-    const targetFidsInput = body.target_fids; 
 
-    // Hepsini tek bir dizide toplayalım
-    let targets = [];
+    const signerUuid = body.signer_uuid as string | undefined;
+    const targetFid = body.targetFid as number | undefined;
+    const targetFidsInput = body.target_fids as number[] | undefined;
+
+    let targets: number[] = [];
     if (Array.isArray(targetFidsInput)) {
-      targets = targetFidsInput;
+      targets = targetFidsInput.map((x) => Number(x)).filter((x) => Number.isFinite(x));
     } else if (targetFid) {
-      targets = [targetFid];
+      targets = [Number(targetFid)];
     }
 
-    // --- SERVER AYARLARI ---
-    const SIGNER_UUID = process.env.NEYNAR_SIGNER_UUID;
     const API_KEY = process.env.NEYNAR_API_KEY;
 
-    if (!SIGNER_UUID) {
-      console.error("❌ HATA: Server tarafında NEYNAR_SIGNER_UUID bulunamadı.");
-      return NextResponse.json({ error: "Server Configuration Error" }, { status: 500 });
+    if (!API_KEY) {
+      return NextResponse.json({ error: "API Key eksik" }, { status: 500 });
+    }
+
+    if (!signerUuid) {
+      // Kullanıcı bazlı signer şart
+      return NextResponse.json({ error: "Signer izni bulunamadı. Lütfen izin verip tekrar dene." }, { status: 400 });
     }
 
     if (targets.length === 0) {
-      return NextResponse.json({ error: "Silinecek FID bulunamadı" }, { status: 400 });
+      return NextResponse.json({ error: "Silinecek hedef bulunamadı" }, { status: 400 });
     }
 
-    console.log(`🔄 Unfollow Başlıyor. Hedef Sayısı: ${targets.length}`);
-    console.log(`🔑 Kullanılan Signer: ${SIGNER_UUID.slice(0, 5)}...`);
+    const results: Array<{ fid: number; success: boolean }> = [];
+    const errors: Array<{ fid: number; error: string }> = [];
 
-    const results = [];
-    const errors = [];
-
-    // --- DÖNGÜ BAŞLIYOR ---
     for (const fid of targets) {
       try {
-        // Neynar v2 API - Delete Follow
         const url = "https://api.neynar.com/v2/farcaster/user/follow";
-        
-        const options = {
+
+        const res = await fetch(url, {
           method: "DELETE",
           headers: {
-            "accept": "application/json",
-            "api_key": API_KEY || "", // Eski header
-            "x-api-key": API_KEY || "", // Yeni header (Garanti olsun)
-            "content-type": "application/json"
+            accept: "application/json",
+            api_key: API_KEY,
+            "x-api-key": API_KEY,
+            "content-type": "application/json",
           },
-          // İŞTE DÜZELTİLEN KISIM BURASI:
           body: JSON.stringify({
-            signer_uuid: SIGNER_UUID,
-            target_fids: [parseInt(fid)] // <--- target_fid YERİNE target_fids (LİSTE HALİNDE)
-          })
-        };
+            signer_uuid: signerUuid,
+            target_fids: [fid],
+          }),
+        });
 
-        const res = await fetch(url, options);
-        const responseText = await res.text();
+        const text = await res.text();
 
-        // Neynar bazen boş body döndürür başarılı olunca, o yüzden status check önemli
         if (!res.ok) {
-            // Hata mesajını parse edelim
-            let errorMsg = responseText;
-            try {
-                const jsonErr = JSON.parse(responseText);
-                errorMsg = jsonErr.message || responseText;
-            } catch (e) {}
-
-            console.error(`❌ Unfollow Başarısız (FID: ${fid}):`, errorMsg);
-            errors.push({ fid, error: errorMsg });
+          let msg = text;
+          try {
+            const jsonErr = JSON.parse(text);
+            msg = jsonErr?.message || jsonErr?.error || text;
+          } catch {
+            // ignore
+          }
+          errors.push({ fid, error: msg || `Unfollow failed (${res.status})` });
         } else {
-            console.log(`✅ Unfollow Başarılı (FID: ${fid})`);
-            results.push({ fid, success: true });
+          results.push({ fid, success: true });
         }
 
-        // Rate limit önlemi (Hızlı istek atıp banlanmamak için)
+        // rate limit koruması
         if (targets.length > 1) {
-            await new Promise(resolve => setTimeout(resolve, 200));
+          await new Promise((r) => setTimeout(r, 250));
         }
-
       } catch (err: any) {
-        console.error(`🔥 Beklenmedik Hata (FID: ${fid}):`, err.message);
-        errors.push({ fid, error: err.message });
+        errors.push({ fid, error: err?.message || "Beklenmedik hata" });
       }
     }
 
-    console.log(`🏁 İşlem Bitti: ${results.length} Silindi, ${errors.length} Hata.`);
-
     return NextResponse.json({
-      success: true,
+      success: errors.length === 0,
       results,
-      errors: errors.length > 0 ? errors : undefined,
+      errors: errors.length ? errors : undefined,
     });
-
   } catch (error: any) {
-    console.error("🔥 API Genel Hatası:", error.message);
-    return NextResponse.json(
-      { error: error.message || "İşlem başarısız" },
-      { status: 500 }
-    );
+    console.error("🔥 API Genel Hatası:", error?.message);
+    return NextResponse.json({ error: error.message || "İşlem başarısız" }, { status: 500 });
   }
 }

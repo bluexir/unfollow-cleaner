@@ -1,32 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY;
-const TARGET_FID = 429973; // Senin FID numaran
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
+const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY;
+const DEV_FID = 429973; // @bluexir
+
+// Bu endpoint: "kullanıcı @bluexir'i takip ediyor mu?" kontrolü yapar.
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const fid = searchParams.get("fid");
+  const userFid = searchParams.get("fid");
 
-  if (!fid) {
+  if (!userFid) {
     return NextResponse.json({ error: "FID gerekli" }, { status: 400 });
   }
 
+  if (!NEYNAR_API_KEY) {
+    return NextResponse.json({ error: "API Key eksik" }, { status: 500 });
+  }
+
   try {
-    // Neynar API üzerinden takip kontrolü
+    // Viewer: kullanıcı, hedef: developer
     const response = await fetch(
-      `https://api.neynar.com/v2/farcaster/user/bulk?fids=${fid}&viewer_fid=${TARGET_FID}`,
+      `https://api.neynar.com/v2/farcaster/user/bulk?fids=${DEV_FID}&viewer_fid=${encodeURIComponent(userFid)}`,
       {
         headers: {
-          api_key: NEYNAR_API_KEY || "",
+          api_key: NEYNAR_API_KEY,
+          "x-api-key": NEYNAR_API_KEY,
+          accept: "application/json",
         },
       }
     );
 
     const data = await response.json();
-    
-    // Kullanıcı bilgisi içinde takip durumu kontrolü
-    const user = data.users?.[0];
-    const isFollowing = user?.viewer_context?.following || false;
+
+    if (!response.ok) {
+      return NextResponse.json({ error: data?.message || "Follow kontrolü başarısız" }, { status: 500 });
+    }
+
+    const dev = data.users?.[0];
+    const isFollowing = Boolean(dev?.viewer_context?.following);
 
     return NextResponse.json({ isFollowing });
   } catch (error) {

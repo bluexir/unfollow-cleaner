@@ -1,116 +1,140 @@
 'use client';
 
-import { useState } from 'react';
-import { parseEther, parseUnits } from 'viem';
-import { useSendTransaction, useWriteContract, useAccount, useConnect } from 'wagmi';
-import { injected } from 'wagmi/connectors';
+import { useMemo, useState } from 'react';
+import sdk from '@farcaster/frame-sdk';
+import { encodeFunctionData, parseEther, parseUnits } from 'viem';
 
-// 🚨 SENİN CÜZDAN ADRESİN (Otomatik Eklendi)
-const RECIPIENT_ADDRESS = "0xaDBd1712D5c6e2A4D7e08F50a9586d3C054E30c8"; 
+// Senin cüzdan adresin
+const RECIPIENT_ADDRESS = '0xaDBd1712D5c6e2A4D7e08F50a9586d3C054E30c8';
 
-// Base Mainnet Token Adresleri
+// Base mainnet
+const BASE_CHAIN_ID_HEX = '0x2105'; // 8453
+
+// Base token adresleri
 const TOKENS = {
-  DEGEN: "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed", 
-  USDC: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-};
-
-// Basit Transfer Kontratı (ABI)
-const ERC20_ABI = [
-  {
-    name: 'transfer',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [{ name: 'to', type: 'address' }, { name: 'amount', type: 'uint256' }],
-    outputs: [{ type: 'bool' }]
-  }
-];
+  DEGEN: '0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed',
+  USDC: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+} as const;
 
 type Currency = 'ETH' | 'DEGEN' | 'USDC';
 
 export default function TipSection() {
-  const { isConnected } = useAccount();
-  const { connect } = useConnect();
-  const { sendTransaction } = useSendTransaction();
-  const { writeContract } = useWriteContract();
-
   const [currency, setCurrency] = useState<Currency>('ETH');
-  const [customAmount, setCustomAmount] = useState('');
   const [status, setStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
+  const [error, setError] = useState<string | null>(null);
 
-  // Hazır Buton Ayarları
-  const presets = {
-    ETH: [
-      { label: '☕️', amount: '0.001', value: '~$3' },
-      { label: '🍔', amount: '0.003', value: '~$10' },
-      { label: '🚀', amount: '0.005', value: '~$18' },
-    ],
-    DEGEN: [
-      { label: '🎩', amount: '200', value: 'DEGEN' },
-      { label: '🎩', amount: '500', value: 'DEGEN' },
-      { label: '🎩', amount: '1000', value: 'DEGEN' },
-    ],
-    USDC: [
-      { label: '💵', amount: '1', value: 'USDC' },
-      { label: '💵', amount: '5', value: 'USDC' },
-      { label: '💵', amount: '10', value: 'USDC' },
-    ]
-  };
+  const presets = useMemo(
+    () => ({
+      ETH: [
+        { label: '☕️', amount: '0.001', sub: '~$3' },
+        { label: '🍔', amount: '0.003', sub: '~$10' },
+        { label: '🚀', amount: '0.005', sub: '~$18' },
+      ],
+      DEGEN: [
+        { label: '🎩', amount: '200', sub: 'DEGEN' },
+        { label: '🎩', amount: '500', sub: 'DEGEN' },
+        { label: '🎩', amount: '1000', sub: 'DEGEN' },
+      ],
+      USDC: [
+        { label: '💵', amount: '1', sub: 'USDC' },
+        { label: '💵', amount: '5', sub: 'USDC' },
+        { label: '💵', amount: '10', sub: 'USDC' },
+      ],
+    }),
+    []
+  );
 
-  const handleTip = (amountStr: string) => {
-    if (!isConnected) {
-      connect({ connector: injected() });
-      return;
-    }
-
+  const sendTip = async (amountStr: string) => {
+    setError(null);
     setStatus('pending');
 
     try {
-      if (currency === 'ETH') {
-        sendTransaction({
-          to: RECIPIENT_ADDRESS,
-          value: parseEther(amountStr)
-        }, {
-          onSuccess: () => { setStatus('success'); setTimeout(() => setStatus('idle'), 5000); },
-          onError: () => { setStatus('error'); setTimeout(() => setStatus('idle'), 3000); }
+      const provider = sdk.wallet.ethProvider;
+
+      // Base'a geçiş dene
+      try {
+        await provider.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: BASE_CHAIN_ID_HEX }],
         });
+      } catch {
+        // bazı client'larda switch desteklenmeyebilir, devam edelim
+      }
+
+      const accounts = (await provider.request({ method: 'eth_requestAccounts', params: [] })) as string[];
+      const from = accounts?.[0];
+      if (!from) throw new Error('Cüzdan bulunamadı');
+
+      if (currency === 'ETH') {
+        const value = parseEther(amountStr);
+        const tx = {
+          from,
+          to: RECIPIENT_ADDRESS,
+          value: `0x${value.toString(16)}`,
+        };
+
+        await provider.request({ method: 'eth_sendTransaction', params: [tx] });
       } else {
         const decimals = currency === 'USDC' ? 6 : 18;
-        writeContract({
-          address: TOKENS[currency] as `0x${string}`,
-          abi: ERC20_ABI,
+        const amount = parseUnits(amountStr, decimals);
+
+        const data = encodeFunctionData({
+          abi: [
+            {
+              type: 'function',
+              name: 'transfer',
+              stateMutability: 'nonpayable',
+              inputs: [
+                { name: 'to', type: 'address' },
+                { name: 'amount', type: 'uint256' },
+              ],
+              outputs: [{ type: 'bool' }],
+            },
+          ],
           functionName: 'transfer',
-          args: [RECIPIENT_ADDRESS, parseUnits(amountStr, decimals)],
-        }, {
-          onSuccess: () => { setStatus('success'); setTimeout(() => setStatus('idle'), 5000); },
-          onError: () => { setStatus('error'); setTimeout(() => setStatus('idle'), 3000); }
+          args: [RECIPIENT_ADDRESS, amount],
         });
+
+        const tx = {
+          from,
+          to: TOKENS[currency],
+          data,
+          value: '0x0',
+        };
+
+        await provider.request({ method: 'eth_sendTransaction', params: [tx] });
       }
-    } catch (e) {
-      console.error(e);
+
+      setStatus('success');
+      setTimeout(() => setStatus('idle'), 5000);
+    } catch (e: any) {
       setStatus('error');
+      setError(e?.message || 'İşlem iptal edildi veya hata oluştu');
+      setTimeout(() => {
+        setStatus('idle');
+        setError(null);
+      }, 4000);
     }
   };
 
   return (
-    <div className="border-t border-gray-800 bg-black/40 backdrop-blur-md p-6 mt-12 rounded-xl">
-      <div className="max-w-md mx-auto text-center space-y-6">
-        
+    <div className="border border-white/5 bg-black/40 backdrop-blur-md p-6 mt-12 rounded-2xl">
+      <div className="max-w-md mx-auto text-center space-y-5">
         <div>
-          <h2 className="text-xl font-bold text-white">Geliştiriciye Destek Ol</h2>
-          <p className="text-gray-500 text-xs mt-1">Bu araç ücretsizdir. Katkıda bulunmak istersen:</p>
+          <h2 className="text-xl font-bold text-white">Geliştiriciye Tip</h2>
+          <p className="text-gray-500 text-xs mt-1">
+            Tip göndermek için Warpcast cüzdanından onay vermen yeterli.
+          </p>
         </div>
 
-        {/* --- MEKANİK KONTROL PANELİ --- */}
-        <div className="bg-gray-900/80 border border-gray-700 rounded-xl p-3 shadow-2xl">
-          
-          {/* 1. Birim Seçici */}
-          <div className="grid grid-cols-3 gap-1 mb-3 bg-black rounded-lg p-1 border border-gray-800">
+        <div className="bg-[#151722] border border-white/5 rounded-2xl p-3 shadow-2xl">
+          <div className="grid grid-cols-3 gap-1 mb-3 bg-black/40 rounded-xl p-1 border border-white/5">
             {(['ETH', 'DEGEN', 'USDC'] as Currency[]).map((curr) => (
               <button
                 key={curr}
-                onClick={() => { setCurrency(curr); setCustomAmount(''); }}
-                className={`py-1.5 text-xs font-bold font-mono rounded transition-all ${
-                  currency === curr ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300'
+                onClick={() => setCurrency(curr)}
+                className={`py-2 text-xs font-bold font-mono rounded-lg transition-colors ${
+                  currency === curr ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-200'
                 }`}
               >
                 {curr}
@@ -118,45 +142,24 @@ export default function TipSection() {
             ))}
           </div>
 
-          {/* 2. Hazır Butonlar */}
-          <div className="grid grid-cols-3 gap-2 mb-3">
-            {presets[currency].map((preset, idx) => (
+          <div className="grid grid-cols-3 gap-2">
+            {presets[currency].map((p, idx) => (
               <button
                 key={idx}
-                onClick={() => handleTip(preset.amount)}
-                className="bg-black border border-gray-700 hover:border-purple-500 hover:bg-gray-800 active:scale-95 rounded-lg p-2 transition-all flex flex-col items-center justify-center h-16 group"
+                onClick={() => sendTip(p.amount)}
+                disabled={status === 'pending'}
+                className="bg-black/40 border border-white/5 hover:border-purple-500/40 hover:bg-white/5 rounded-xl p-3 transition-colors flex flex-col items-center justify-center h-16 disabled:opacity-60"
               >
-                <span className="text-white font-bold">{preset.amount}</span>
-                <span className="text-[10px] text-gray-500 group-hover:text-purple-400">{preset.value}</span>
+                <span className="text-white font-bold font-mono">{p.amount}</span>
+                <span className="text-[10px] text-gray-500">{p.sub}</span>
               </button>
             ))}
           </div>
-
-          {/* 3. Manuel Giriş */}
-          <div className="relative">
-            <input
-              type="number"
-              placeholder="Farklı Tutar..."
-              value={customAmount}
-              onChange={(e) => setCustomAmount(e.target.value)}
-              className="w-full bg-black border border-gray-700 rounded-lg py-2 px-3 text-white text-sm focus:border-purple-500 focus:outline-none font-mono"
-            />
-            {customAmount && (
-              <button
-                onClick={() => handleTip(customAmount)}
-                className="absolute right-1 top-1 bottom-1 bg-purple-600 hover:bg-purple-500 text-white px-3 rounded text-xs font-bold"
-              >
-                GÖNDER
-              </button>
-            )}
-          </div>
         </div>
 
-        {/* Durum Mesajları */}
-        {status === 'pending' && <p className="text-yellow-400 text-xs animate-pulse">⚡️ Cüzdan onayı bekleniyor...</p>}
-        {status === 'success' && <p className="text-green-400 text-xs">✅ Teşekkürler! İşlem gönderildi.</p>}
-        {status === 'error' && <p className="text-red-400 text-xs">❌ Hata oluştu veya iptal edildi.</p>}
-
+        {status === 'pending' && <p className="text-yellow-300 text-xs animate-pulse">Cüzdan onayı bekleniyor…</p>}
+        {status === 'success' && <p className="text-green-300 text-xs">Teşekkürler! İşlem gönderildi.</p>}
+        {status === 'error' && <p className="text-red-300 text-xs">{error || 'Hata oluştu.'}</p>}
       </div>
     </div>
   );

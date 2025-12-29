@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neynarClient } from "@/lib/neynar";
 
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const signerUuid = searchParams.get("signer_uuid");
@@ -12,15 +15,13 @@ export async function GET(req: NextRequest) {
   try {
     const signer = await neynarClient.lookupSigner({ signerUuid });
 
-    if (signer.status === 'approved' && signer.fid) {
-      return NextResponse.json({
-        approved: true,
-        fid: signer.fid
-      });
-    }
-
-    return NextResponse.json({ approved: false });
-  } catch (error) {
+    // Frontend'in polling'ine uyumlu tek format
+    return NextResponse.json({
+      status: signer.status, // pending | approved | revoked
+      fid: signer.fid ?? null,
+      signer_uuid: signer.signer_uuid,
+    });
+  } catch (error: any) {
     console.error("Signer kontrol hatası:", error);
     return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
   }
