@@ -1,43 +1,53 @@
 "use client";
-import { useFarcaster } from "./providers";
-import AppShell from "@/components/AppShell";
+import { useEffect, useState, createContext, useContext } from "react";
+import sdk from "@farcaster/frame-sdk";
+import { WagmiProvider, createConfig, http } from "wagmi";
+import { base } from "wagmi/chains";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-export default function Home() {
-  const { context } = useFarcaster();
+export const config = createConfig({
+  chains: [base],
+  transports: {
+    [base.id]: http(),
+  },
+});
 
-  // 1) SDK yüklenirken
-  if (!context) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0f1117]">
-        <div className="loader mb-4"></div>
-        <p className="text-gray-500 text-xs tracking-[0.2em] animate-pulse">SYSTEM INITIALIZING...</p>
-      </div>
-    );
-  }
+const queryClient = new QueryClient();
 
-  // 2) Warpcast dışında açıldıysa
-  if (!context.user) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0f1117] p-8 text-center text-white">
-        <div className="text-5xl mb-6">📱</div>
-        <h1 className="text-2xl font-bold mb-4">Mobile App Only</h1>
-        <p className="text-gray-400 mb-8 leading-relaxed">
-          Unfollow Cleaner, Warpcast mini app deneyimi için tasarlandı.
-          Lütfen bu linki Warpcast içinde aç.
-        </p>
+type FrameContext = Awaited<typeof sdk.context>;
+
+const FarcasterContext = createContext<{ context: FrameContext | undefined }>({
+  context: undefined,
+});
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  const [context, setContext] = useState<FrameContext>();
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const frameContext = await sdk.context;
+        setContext(frameContext);
         
-          href="https://warpcast.com/bluexir"
-          className="bg-[#7C65C1] text-white px-8 py-3 rounded-xl font-bold hover:bg-[#6952a3] transition-colors"
-        >
-          Warpcast'ı Aç
-        </a>
-      </div>
-    );
-  }
+        sdk.actions.ready(); 
+      } catch (error) {
+        console.error("SDK Yükleme Hatası:", error);
+      }
+    };
+    if (typeof window !== "undefined") {
+      init();
+    }
+  }, []);
 
   return (
-    <main data-testid="app-root" className="min-h-screen bg-app">
-      <AppShell user={context.user} />
-    </main>
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        <FarcasterContext.Provider value={{ context }}>
+          {children}
+        </FarcasterContext.Provider>
+      </QueryClientProvider>
+    </WagmiProvider>
   );
 }
+
+export const useFarcaster = () => useContext(FarcasterContext);
