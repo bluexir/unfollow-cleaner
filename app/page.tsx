@@ -5,7 +5,6 @@ import AppShell from "@/components/AppShell";
 export default function Home() {
   const { context } = useFarcaster();
 
-  // 1) SDK yüklenirken
   if (!context) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0f1117]">
@@ -15,8 +14,7 @@ export default function Home() {
     );
   }
 
-  // 2) Warpcast dışında açıldıysa
-  if (!context.client?.clientFid) {
+  if (!context.user) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0f1117] p-8 text-center text-white">
         <div className="text-5xl mb-6">📱</div>
@@ -35,20 +33,9 @@ export default function Home() {
     );
   }
 
-  // 3) User varsa direkt göster
-  if (context.user?.fid) {
-    return (
-      <main data-testid="app-root" className="min-h-screen bg-app">
-        <AppShell user={context.user} />
-      </main>
-    );
-  }
-
-  // 4) User yok ama context var - bu durumda da AppShell'e git
-  // AppShell içinde follow gate var
   return (
     <main data-testid="app-root" className="min-h-screen bg-app">
-      <AppShell user={{ fid: context.client.clientFid }} />
+      <AppShell user={context.user} />
     </main>
   );
 }
