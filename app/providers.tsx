@@ -1,107 +1,43 @@
 "use client";
-import { useEffect, useState, createContext, useContext } from "react";
-import sdk from "@farcaster/frame-sdk";
-import { WagmiProvider, createConfig, http } from "wagmi";
-import { base } from "wagmi/chains";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useFarcaster } from "./providers";
+import AppShell from "@/components/AppShell";
 
-export const config = createConfig({
-  chains: [base],
-  transports: {
-    [base.id]: http(),
-  },
-});
+export default function Home() {
+  const { context } = useFarcaster();
 
-const queryClient = new QueryClient();
+  // 1) SDK yüklenirken
+  if (!context) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0f1117]">
+        <div className="loader mb-4"></div>
+        <p className="text-gray-500 text-xs tracking-[0.2em] animate-pulse">SYSTEM INITIALIZING...</p>
+      </div>
+    );
+  }
 
-type FrameContext = Awaited<typeof sdk.context>;
-
-interface FarcasterContextType {
-  context: FrameContext | undefined;
-  isAuthenticated: boolean;
-  fid: number | null;
-  login: () => Promise<void>;
-  logout: () => void;
-}
-
-const FarcasterContext = createContext<FarcasterContextType>({
-  context: undefined,
-  isAuthenticated: false,
-  fid: null,
-  login: async () => {},
-  logout: () => {},
-});
-
-export function Providers({ children }: { children: React.ReactNode }) {
-  const [context, setContext] = useState<FrameContext>();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [fid, setFid] = useState<number | null>(null);
-
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const frameContext = await sdk.context;
-        setContext(frameContext);
+  // 2) Warpcast dışında açıldıysa
+  if (!context.user) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0f1117] p-8 text-center text-white">
+        <div className="text-5xl mb-6">📱</div>
+        <h1 className="text-2xl font-bold mb-4">Mobile App Only</h1>
+        <p className="text-gray-400 mb-8 leading-relaxed">
+          Unfollow Cleaner, Warpcast mini app deneyimi için tasarlandı.
+          Lütfen bu linki Warpcast içinde aç.
+        </p>
         
-        // Context'ten user bilgisi varsa direkt authenticated sayıyoruz
-        if (frameContext.user?.fid) {
-          setIsAuthenticated(true);
-          setFid(frameContext.user.fid);
-        }
-        
-        sdk.actions.ready();
-      } catch (error) {
-        console.error("SDK Yükleme Hatası:", error);
-      }
-    };
-    
-    if (typeof window !== "undefined") {
-      init();
-    }
-  }, []);
-
-  const login = async () => {
-    try {
-      // quickAuth kullanarak token al
-      const result = await sdk.quickAuth.getToken();
-      
-      if (result?.token) {
-        // Token'ı backend'e gönder
-        const response = await fetch("/api/auth", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: result.token }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setIsAuthenticated(true);
-          setFid(data.fid);
-          
-          // Context'i güncelle
-          const newContext = await sdk.context;
-          setContext(newContext);
-        }
-      }
-    } catch (error) {
-      console.error("Login hatası:", error);
-    }
-  };
-
-  const logout = () => {
-    setIsAuthenticated(false);
-    setFid(null);
-  };
+          href="https://warpcast.com/bluexir"
+          className="bg-[#7C65C1] text-white px-8 py-3 rounded-xl font-bold hover:bg-[#6952a3] transition-colors"
+        >
+          Warpcast'ı Aç
+        </a>
+      </div>
+    );
+  }
 
   return (
-    <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
-        <FarcasterContext.Provider value={{ context, isAuthenticated, fid, login, logout }}>
-          {children}
-        </FarcasterContext.Provider>
-      </QueryClientProvider>
-    </WagmiProvider>
+    <main data-testid="app-root" className="min-h-screen bg-app">
+      <AppShell user={context.user} />
+    </main>
   );
 }
-
-export const useFarcaster = () => useContext(FarcasterContext);
