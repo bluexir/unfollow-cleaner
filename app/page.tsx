@@ -12,8 +12,7 @@ export default function Home() {
         <p className="text-gray-500 text-xs tracking-[0.2em] animate-pulse">SYSTEM INITIALIZING...</p>
       </div>
     );
-  }
-
+}
   if (!context.user) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0f1117] p-8 text-center text-white">
