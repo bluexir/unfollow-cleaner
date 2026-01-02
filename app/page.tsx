@@ -9,7 +9,9 @@ export default function Home() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0f1117]">
         <div className="loader mb-4"><[/div](https://farcaster.xyz/~/channel/div)>
-        <p className="text-gray-500 text-xs tracking-[0.2em] animate-pulse">SYSTEM INITIALIZING...<[/p](https://farcaster.xyz/~/channel/p)>
+        <p className="text-gray-500 text-xs tracking-[0.2em] animate-pulse">
+          SYSTEM INITIALIZING...
+        <[/p](https://farcaster.xyz/~/channel/p)>
       <[/div](https://farcaster.xyz/~/channel/div)>
     );
   }
