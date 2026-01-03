@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   title: "Unfollow Cleaner",
   description: "Farcaster Takipçi Temizleme Aracı - Seni takip etmeyenleri bul ve temizle",
   
-  // Open Graph (Farcaster için gerekli)
+  // Open Graph
   openGraph: {
     title: "Unfollow Cleaner",
     description: "Seni takip etmeyenleri bul ve temizle",
@@ -23,8 +23,25 @@ export const metadata: Metadata = {
     ],
   },
   
-  // Farcaster Frame Metadata
+  // Farcaster Mini App Metadata
   other: {
+    // Mini App manifest
+    "fc:miniapp": JSON.stringify({
+      version: "1",
+      imageUrl: "https://unfollow-cleaner.vercel.app/og-image.png",
+      button: {
+        title: "Başla",
+        action: {
+          type: "launch_frame",
+          name: "Unfollow Cleaner",
+          url: "https://unfollow-cleaner.vercel.app",
+          splashImageUrl: "https://unfollow-cleaner.vercel.app/icon.png",
+          splashBackgroundColor: "#0f1117"
+        }
+      }
+    }),
+    
+    // Backward compatibility - Frame v1
     "fc:frame": "vNext",
     "fc:frame:image": "https://unfollow-cleaner.vercel.app/og-image.png",
     "fc:frame:button:1": "Başla",
@@ -32,7 +49,7 @@ export const metadata: Metadata = {
     "fc:frame:button:1:target": "https://unfollow-cleaner.vercel.app",
   },
   
-  // Mini App spesifik
+  // PWA Manifest
   manifest: "/manifest.json",
 };
 
