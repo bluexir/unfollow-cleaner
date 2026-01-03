@@ -24,12 +24,13 @@ export async function GET(req: NextRequest) {
 
     while (followingCursor !== null) {
       const response = await neynarClient.fetchUserFollowing({
-        fid: fidNumber,  // ← DEĞİŞTİ! Artık obje içinde
+        fid: fidNumber,
         limit: 100,
         cursor: followingCursor,
       });
 
-      response.users.forEach((item: any) => {
+      // ✅ DÜZELT: response.result.users
+      response.result.users.forEach((item: any) => {
         const user = item.user || item;
         if (user && user.fid) {
           followingMap.set(user.fid, {
@@ -44,8 +45,9 @@ export async function GET(req: NextRequest) {
         }
       });
 
-      followingCursor = response.next?.cursor || undefined;
-      followingCount += response.users.length;
+      // ✅ DÜZELT: response.result.next.cursor
+      followingCursor = response.result.next?.cursor || undefined;
+      followingCount += response.result.users.length;
       
       if (followingCount >= 3000) break;
     }
@@ -59,20 +61,22 @@ export async function GET(req: NextRequest) {
 
     while (followersCursor !== null) {
       const response = await neynarClient.fetchUserFollowers({
-        fid: fidNumber,  // ← DEĞİŞTİ! Artık obje içinde
+        fid: fidNumber,
         limit: 100,
         cursor: followersCursor,
       });
 
-      response.users.forEach((item: any) => {
+      // ✅ DÜZELT: response.result.users
+      response.result.users.forEach((item: any) => {
         const user = item.user || item;
         if (user && user.fid) {
           followersSet.add(user.fid);
         }
       });
 
-      followersCursor = response.next?.cursor || undefined;
-      followersCount += response.users.length;
+      // ✅ DÜZELT: response.result.next.cursor
+      followersCursor = response.result.next?.cursor || undefined;
+      followersCount += response.result.users.length;
 
       if (followersCount >= 3000) break;
     }
