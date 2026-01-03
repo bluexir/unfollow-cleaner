@@ -1,7 +1,16 @@
-import { NeynarAPIClient } from "@neynar/nodejs-sdk";
+import { NeynarAPIClient, Configuration } from "@neynar/nodejs-sdk";
 
 if (!process.env.NEYNAR_API_KEY) {
   throw new Error("NEYNAR_API_KEY ortam değişkeni eksik!");
 }
 
-export const neynarClient = new NeynarAPIClient(process.env.NEYNAR_API_KEY);
+const config = new Configuration({
+  apiKey: process.env.NEYNAR_API_KEY,
+  baseOptions: {
+    headers: {
+      "x-neynar-experimental": "true",
+    },
+  },
+});
+
+export const neynarClient = new NeynarAPIClient(config);
