@@ -25,13 +25,19 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const init = async () => {
+      console.log("[DEBUG] SDK başlatılıyor...");
       try {
+        console.log("[DEBUG] sdk.context çekiliyor...");
         const frameContext = await sdk.context;
+        console.log("[DEBUG] Context alındı:", frameContext);
         setContext(frameContext);
         
-        sdk.actions.ready(); 
+        console.log("[DEBUG] sdk.actions.ready() çağrılıyor...");
+        sdk.actions.ready();
+        console.log("[SUCCESS] SDK hazır!");
       } catch (error) {
-        console.error("SDK Yükleme Hatası:", error);
+        console.error("[ERROR] SDK Yükleme Hatası:", error);
+        console.error("[ERROR] Hata detayı:", JSON.stringify(error));
       }
     };
     if (typeof window !== "undefined") {
