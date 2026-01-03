@@ -4,13 +4,18 @@ import { useMemo, useState } from 'react';
 import sdk from '@farcaster/frame-sdk';
 import { encodeFunctionData, parseEther, parseUnits } from 'viem';
 
+/**
+ * Unfollow Cleaner - Tip (Bahşiş) Bileşeni
+ * Base ağı üzerinde ETH, DEGEN ve USDC gönderimini sağlar.
+ */
+
 // Senin cüzdan adresin
 const RECIPIENT_ADDRESS = '0xaDBd1712D5c6e2A4D7e08F50a9586d3C054E30c8';
 
-// Base mainnet
+// Base mainnet ID (Hex formatı RPC istekleri için gereklidir)
 const BASE_CHAIN_ID_HEX = '0x2105'; // 8453
 
-// Base token adresleri
+// Base ağındaki token sözleşme adresleri
 const TOKENS = {
   DEGEN: '0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed',
   USDC: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
@@ -50,21 +55,25 @@ export default function TipSection() {
 
     try {
       const provider = sdk.wallet.ethProvider;
+      if (!provider) throw new Error('Farcaster cüzdan sağlayıcısı bulunamadı.');
 
-      // Base'a geçiş dene
+      // 1. Ağ Kontrolü ve Base'e Geçiş
       try {
         await provider.request({
           method: 'wallet_switchEthereumChain',
           params: [{ chainId: BASE_CHAIN_ID_HEX }],
         });
-      } catch {
-        // bazı client'larda switch desteklenmeyebilir, devam edelim
+      } catch (switchError) {
+        // Bazı cüzdanlar otomatik geçişi reddedebilir, devam edip şansımızı deniyoruz
+        console.warn("Ağ geçiş isteği reddedildi veya desteklenmiyor.");
       }
 
+      // 2. Hesap Bağlantısı
       const accounts = (await provider.request({ method: 'eth_requestAccounts', params: [] })) as string[];
       const from = accounts?.[0];
-      if (!from) throw new Error('Cüzdan bulunamadı');
+      if (!from) throw new Error('Cüzdan bağlantısı kurulamadı.');
 
+      // 3. İşlem Hazırlığı
       if (currency === 'ETH') {
         const value = parseEther(amountStr);
         const tx = {
@@ -75,9 +84,11 @@ export default function TipSection() {
 
         await provider.request({ method: 'eth_sendTransaction', params: [tx] });
       } else {
+        // Token Decimals Ayarı (USDC 6, DEGEN 18'dir)
         const decimals = currency === 'USDC' ? 6 : 18;
         const amount = parseUnits(amountStr, decimals);
 
+        // ERC-20 Transfer Fonksiyonu Kodlaması
         const data = encodeFunctionData({
           abi: [
             {
@@ -108,6 +119,7 @@ export default function TipSection() {
       setStatus('success');
       setTimeout(() => setStatus('idle'), 5000);
     } catch (e: any) {
+      console.error("İşlem hatası:", e);
       setStatus('error');
       setError(e?.message || 'İşlem iptal edildi veya hata oluştu');
       setTimeout(() => {
