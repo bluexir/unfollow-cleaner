@@ -17,95 +17,22 @@ export async function GET(req: NextRequest) {
   try {
     console.log(`🚀 [ANALİZ] Başlıyor - FID: ${fidNumber}`);
 
-    // 1. Takip Edilenleri (Following) Çek
-    const followingMap = new Map();
-    let followingCursor: string | undefined = undefined;
-    let followingCount = 0;
+    const response = await neynarClient.fetchUserFollowing({
+      fid: fidNumber,
+      limit: 10,
+    });
 
-    while (followingCursor !== null) {
-      const response = await neynarClient.fetchUserFollowing({
-        fid: fidNumber,
-        limit: 100,
-        cursor: followingCursor,
-      });
-
-      // ✅ DÜZELT: response.result.users
-      response.result.users.forEach((item: any) => {
-        const user = item.user || item;
-        if (user && user.fid) {
-          followingMap.set(user.fid, {
-            fid: user.fid,
-            username: user.username,
-            display_name: user.display_name || user.username,
-            pfp_url: user.pfp_url,
-            follower_count: user.follower_count,
-            power_badge: user.power_badge,
-            neynar_score: user.experimental?.neynar_user_score ?? null,
-          });
-        }
-      });
-
-      // ✅ DÜZELT: response.result.next.cursor
-      followingCursor = response.result.next?.cursor || undefined;
-      followingCount += response.result.users.length;
-      
-      if (followingCount >= 3000) break;
-    }
-
-    console.log(`✅ [FOLLOWING] ${followingMap.size} kişi alındı.`);
-
-    // 2. Takipçileri (Followers) Çek
-    const followersSet = new Set<number>();
-    let followersCursor: string | undefined = undefined;
-    let followersCount = 0;
-
-    while (followersCursor !== null) {
-      const response = await neynarClient.fetchUserFollowers({
-        fid: fidNumber,
-        limit: 100,
-        cursor: followersCursor,
-      });
-
-      // ✅ DÜZELT: response.result.users
-      response.result.users.forEach((item: any) => {
-        const user = item.user || item;
-        if (user && user.fid) {
-          followersSet.add(user.fid);
-        }
-      });
-
-      // ✅ DÜZELT: response.result.next.cursor
-      followersCursor = response.result.next?.cursor || undefined;
-      followersCount += response.result.users.length;
-
-      if (followersCount >= 3000) break;
-    }
-
-    console.log(`✅ [FOLLOWERS] ${followersSet.size} kişi alındı.`);
-
-    // 3. Hayaletleri (Ghosts) Filtrele
-    const followingList = Array.from(followingMap.values());
-    const nonFollowers = followingList.filter(
-      (user) => !followersSet.has(user.fid)
-    );
-
-    const sortedNonFollowers = nonFollowers.sort((a, b) => a.follower_count - b.follower_count);
-
-    console.log(`🎯 [SONUÇ] ${sortedNonFollowers.length} kişi seni takip etmiyor.`);
+    console.log("📦 [RESPONSE STRUCTURE]:", JSON.stringify(response, null, 2));
 
     return NextResponse.json({
-      nonFollowers: sortedNonFollowers,
-      stats: {
-        following: followingMap.size,
-        followers: followersSet.size,
-        nonFollowersCount: sortedNonFollowers.length,
-      },
+      debug: "Response structure logged to Vercel",
+      response: response
     });
 
   } catch (error: any) {
     console.error("🔥 [API HATASI]:", error.message);
     return NextResponse.json(
-      { error: "Kullanıcı verileri analiz edilemedi. Neynar bağlantısını kontrol edin." },
+      { error: error.message },
       { status: 500 }
     );
   }
