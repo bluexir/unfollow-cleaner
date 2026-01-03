@@ -1,53 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
+import { neynarClient } from "@/lib/neynar";
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
+
+/**
+ * Farcaster Takip Etmeyenleri Bulma API (Production Sürümü)
+ * Neynar SDK kullanarak takipçi ve takip edilen listelerini karşılaştırır.
+ * Vercel'in 10-30 saniyelik timeout sınırlarını korumak için optimize edilmiştir.
+ */
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const fid = searchParams.get("fid");
   
-  const API_KEY = process.env.NEYNAR_API_KEY;
-  
   if (!fid) {
-    return NextResponse.json({ error: "FID gerekli" }, { status: 400 });
-  }
-  if (!API_KEY) {
-    return NextResponse.json({ error: "API Key eksik" }, { status: 500 });
+    return NextResponse.json({ error: "FID parametresi gerekli" }, { status: 400 });
   }
 
   const fidNumber = parseInt(fid);
 
   try {
-    console.log(`🚀 [START] Analiz başlıyor - FID: ${fidNumber}`);
+    console.log(`🚀 [ANALİZ] Başlıyor - FID: ${fidNumber}`);
 
-    const headers = {
-      "accept": "application/json",
-      "api_key": API_KEY,
-      "x-neynar-experimental": "true",
-    };
-
+    // 1. Takip Edilenleri (Following) Çek
+    // Neynar paketleme (limit 100) kullanarak listeyi oluşturuyoruz.
     const followingMap = new Map();
-    let followingCursor = "";
-    let followingLoop = 0;
+    let followingCursor: string | null = "";
+    let followingCount = 0;
 
-    console.log("📡 [FOLLOWING] İstek başlıyor...");
-    do {
-      let url = `https://api.neynar.com/v2/farcaster/following?fid=${fidNumber}&limit=100`;
-      if (followingCursor) url += `&cursor=${followingCursor}`;
+    while (followingCursor !== null) {
+      const response = await neynarClient.fetchUserFollowing(fidNumber, {
+        limit: 100,
+        cursor: followingCursor || undefined,
+      });
 
-      const res = await fetch(url, { headers });
-      
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error(`❌ [FOLLOWING] API Hatası:`, errorText);
-        throw new Error(`Following API failed: ${res.status}`);
-      }
-
-      const data = await res.json();
-      const users = data.users || [];
-
-      users.forEach((item: any) => {
+      response.users.forEach((item: any) => {
+        // SDK bazen iç içe user objesi dönebilir, güvenli okuma yapıyoruz
         const user = item.user || item;
         if (user && user.fid) {
           followingMap.set(user.fid, {
@@ -57,73 +46,72 @@ export async function GET(req: NextRequest) {
             pfp_url: user.pfp_url,
             follower_count: user.follower_count,
             power_badge: user.power_badge,
-            profile: user.profile,
-            neynar_score: user.experimental?.neynar_user_score ?? null, // SCORE EKLENDİ
+            neynar_score: user.experimental?.neynar_user_score ?? null,
           });
         }
       });
 
-      followingCursor = data.next?.cursor || "";
-      followingLoop++;
-      if (followingLoop >= 50) break;
-    } while (followingCursor);
-
-    console.log(`✅ [FOLLOWING] Toplam: ${followingMap.size} kişi`);
-
-    const followersSet = new Set<number>();
-    let followersCursor = "";
-    let followersLoop = 0;
-
-    console.log("📡 [FOLLOWERS] Normal endpoint + spam filter...");
-    do {
-      let url = `https://api.neynar.com/v2/farcaster/followers?fid=${fidNumber}&limit=100`;
-      if (followersCursor) url += `&cursor=${followersCursor}`;
-
-      const res = await fetch(url, { headers });
+      followingCursor = response.next?.cursor || null;
+      followingCount += response.users.length;
       
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error(`❌ [FOLLOWERS] API Hatası:`, errorText);
-        throw new Error(`Followers API failed: ${res.status}`);
-      }
+      // Güvenlik sınırı: 3000 kişi. 
+      // Vercel serverless fonksiyonlarının 10 sn zaman aşımına düşmemesi için gerçekçi bir limit.
+      if (followingCount >= 3000) break;
+    }
 
-      const data = await res.json();
-      const users = data.users || [];
+    console.log(`✅ [FOLLOWING] ${followingMap.size} kişi paketler halinde alındı.`);
 
-      users.forEach((item: any) => {
+    // 2. Takipçileri (Followers) Çek
+    const followersSet = new Set<number>();
+    let followersCursor: string | null = "";
+    let followersCount = 0;
+
+    while (followersCursor !== null) {
+      const response = await neynarClient.fetchUserFollowers(fidNumber, {
+        limit: 100,
+        cursor: followersCursor || undefined,
+      });
+
+      response.users.forEach((item: any) => {
         const user = item.user || item;
         if (user && user.fid) {
           followersSet.add(user.fid);
         }
       });
 
-      followersCursor = data.next?.cursor || "";
-      followersLoop++;
-      if (followersLoop >= 50) break;
-    } while (followersCursor);
+      followersCursor = response.next?.cursor || null;
+      followersCount += response.users.length;
 
-    console.log(`✅ [FOLLOWERS] Toplam (spam filtreli): ${followersSet.size} kişi`);
+      // Karşılaştırma için Following sayısı kadar takipçi bakmak yeterlidir.
+      if (followersCount >= 3000) break;
+    }
 
+    console.log(`✅ [FOLLOWERS] ${followersSet.size} kişi paketler halinde alındı.`);
+
+    // 3. Hayaletleri (Ghosts) Filtrele
     const followingList = Array.from(followingMap.values());
     const nonFollowers = followingList.filter(
       (user) => !followersSet.has(user.fid)
     );
 
-    console.log(`🎯 [SONUÇ] Non-followers: ${nonFollowers.length} kişi`);
+    // Takipçi sayısına göre artan sıralama (Gerçek hayaletler genelde düşük takipçilidir)
+    const sortedNonFollowers = nonFollowers.sort((a, b) => a.follower_count - b.follower_count);
+
+    console.log(`🎯 [SONUÇ] ${sortedNonFollowers.length} kişi seni takip etmiyor.`);
 
     return NextResponse.json({
-      nonFollowers: nonFollowers,
+      nonFollowers: sortedNonFollowers,
       stats: {
         following: followingMap.size,
         followers: followersSet.size,
-        nonFollowersCount: nonFollowers.length,
+        nonFollowersCount: sortedNonFollowers.length,
       },
     });
 
   } catch (error: any) {
-    console.error("🔥 [ERROR]:", error.message);
+    console.error("🔥 [API HATASI]:", error.message);
     return NextResponse.json(
-      { error: error.message || "Bir hata oluştu" },
+      { error: "Kullanıcı verileri analiz edilemedi. Neynar bağlantısını kontrol edin." },
       { status: 500 }
     );
   }
