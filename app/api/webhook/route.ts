@@ -2,14 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * Farcaster Mini App Webhook Altyapısı
- * Bildirim aboneliklerini ve uygulama olaylarını yönetir.
+ * GET: Farcaster manifest doğrulaması için gereklidir (405 hatasını çözer).
+ * POST: Bildirim ve uygulama olaylarını yönetir.
  */
+
+export async function GET() {
+  return NextResponse.json({ status: "ok", message: "Webhook is active" });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { event } = body;
 
-    // Olay türüne göre işlem yap (Döküman standartlarına uygun)
+    // Olay türüne göre işlem yap
     switch (event) {
       case "notifications_enabled":
         console.log(`Bildirimler açıldı: ${body.fid}`);
