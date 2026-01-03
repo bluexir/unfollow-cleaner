@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import sdk from '@farcaster/frame-sdk';
 
 interface ShareCastPopupProps {
   unfollowCount: number;
@@ -12,10 +13,23 @@ export default function ShareCastPopup({ unfollowCount, onClose }: ShareCastPopu
 
   const handleShare = () => {
     setIsSharing(true);
-    const text = `I just unfollowed ${unfollowCount} people who don't follow me back! Clean up your Farcaster with Unfollow Cleaner 🧹`;
-    const shareUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=https://unfollow-cleaner.vercel.app`;
     
-    window.open(shareUrl, '_blank');
+    // Paylaşılacak metin ve uygulama linki
+    const text = `I just unfollowed ${unfollowCount} people who don't follow me back! Clean up your Farcaster with Unfollow Cleaner 🧹`;
+    // Domain bilgisini dinamik alarak manifest ile uyumluluğu garanti ediyoruz
+    const shareUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${window.location.origin}`;
+    
+    try {
+      // Farcaster Mini App v2 standartlarında dış link/paylaşım açma yöntemi
+      if (typeof sdk !== 'undefined' && sdk.actions?.openUrl) {
+        sdk.actions.openUrl(shareUrl);
+      } else {
+        // Fallback: SDK yüklü değilse standart yöntem
+        window.open(shareUrl, '_blank');
+      }
+    } catch (error) {
+      window.open(shareUrl, '_blank');
+    }
     
     setTimeout(() => {
       onClose();
