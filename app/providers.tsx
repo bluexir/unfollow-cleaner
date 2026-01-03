@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, createContext, useContext } from "react";
+import { useEffect, useState, createContext, useContext, ReactNode } from "react";
 import sdk from "@farcaster/frame-sdk";
 import { WagmiProvider, createConfig, http } from "wagmi";
 import { base } from "wagmi/chains";
@@ -14,32 +14,43 @@ export const config = createConfig({
 
 const queryClient = new QueryClient();
 
+// SDK Context tipini güvenli hale getiriyoruz
 type FrameContext = Awaited<typeof sdk.context>;
 
-const FarcasterContext = createContext<{ context: FrameContext | undefined }>({
+const FarcasterContext = createContext<{ 
+  context: FrameContext | undefined; 
+  isSDKLoaded: boolean 
+}>({
   context: undefined,
+  isSDKLoaded: false,
 });
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({ children }: { children: ReactNode }) {
   const [context, setContext] = useState<FrameContext>();
+  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
 
   useEffect(() => {
     const init = async () => {
-      console.log("[DEBUG] SDK başlatılıyor...");
+      console.log("🛠️ [SDK] Başlatma süreci başladı...");
+      
       try {
-        console.log("[DEBUG] sdk.context çekiliyor...");
+        // SDK Context'ini yükle
         const frameContext = await sdk.context;
-        console.log("[DEBUG] Context alındı:", frameContext);
         setContext(frameContext);
-        
-        console.log("[DEBUG] sdk.actions.ready() çağrılıyor...");
-        sdk.actions.ready();
-        console.log("[SUCCESS] SDK hazır!");
+        console.log("✅ [SDK] Context başarıyla alındı.");
+
+        // ÖNEMLİ: Uygulamanın Warpcast içinde görünür olması için 'ready' şarttır.
+        // Hata olsa bile 'ready' çağrılmalıdır ki splash screen kapansın.
+        await sdk.actions.ready();
+        console.log("🚀 [SDK] Uygulama 'Ready' durumuna geçti.");
       } catch (error) {
-        console.error("[ERROR] SDK Yükleme Hatası:", error);
-        console.error("[ERROR] Hata detayı:", JSON.stringify(error));
+        console.error("❌ [SDK] Yükleme sırasında hata:", error);
+      } finally {
+        // Hata olsa da olmasa da yükleme durumunu tamamla
+        setIsSDKLoaded(true);
       }
     };
+
     if (typeof window !== "undefined") {
       init();
     }
@@ -48,7 +59,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <FarcasterContext.Provider value={{ context }}>
+        <FarcasterContext.Provider value={{ context, isSDKLoaded }}>
           {children}
         </FarcasterContext.Provider>
       </QueryClientProvider>
