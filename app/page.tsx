@@ -25,11 +25,13 @@ export default function Home() {
           Unfollow Cleaner, Warpcast mini app deneyimi için tasarlandı.
           Lütfen bu linki Warpcast içinde aç.
         <[/p](https://farcaster.xyz/~/channel/p)>
-        <a
+        </p>
+        
           href="https://warpcast.com/bluexir"
           className="bg-[#7C65C1] text-white px-8 py-3 rounded-xl font-bold hover:bg-[#6952a3] transition-colors"
         >
           Warpcast'ı Aç
+        </a>
         <[/a](https://farcaster.xyz/~/channel/a)>
       <[/div](https://farcaster.xyz/~/channel/div)>
     );
