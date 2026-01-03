@@ -29,7 +29,7 @@ export default function Home() {
         
           href="https://warpcast.com/bluexir"
           className="bg-[#7C65C1] text-white px-8 py-3 rounded-xl font-bold hover:bg-[#6952a3] transition-colors"
-        >
+        
           Warpcast'ı Aç
         </a>
         <[/a](https://farcaster.xyz/~/channel/a)>
