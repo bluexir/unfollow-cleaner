@@ -28,8 +28,3 @@ export async function GET(req: NextRequest) {
     }, { status: 500 });
   }
 }
-```
-
-Deploy edin, sonra şu URL'i açın:
-```
-https://unfollow-cleaner.vercel.app/api/test-app-fid
