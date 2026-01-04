@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"] });
 // Mini app embed data
 const embedData = {
   version: "1",
-  imageUrl: "https://unfollow-cleaner.vercel.app/og-image.png",
+  imageUrl: "https://unfollow-cleaner.vercel.app/icon.png",
   button: {
     title: "Başla",
     action: {
