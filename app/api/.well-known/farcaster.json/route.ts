@@ -14,7 +14,8 @@ export async function GET() {
       icon_url: "https://unfollow-cleaner.vercel.app/icon.png",
       home_url: "https://unfollow-cleaner.vercel.app",
       splash_image_url: "https://unfollow-cleaner.vercel.app/icon.png",
-      splash_background_color: "#0f1117"
+      splash_background_color: "#0f1117",
+      webhook_url: "https://unfollow-cleaner.vercel.app/api/webhook"
     }
   };
 
