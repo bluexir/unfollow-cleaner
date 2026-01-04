@@ -5,12 +5,11 @@ import { Providers } from "./providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
-// Mini app embed data
 const embedData = {
   version: "1",
   imageUrl: "https://unfollow-cleaner.vercel.app/icon.png",
   button: {
-    title: "Başla",
+    title: "Start",
     action: {
       type: "launch_miniapp",
       name: "Unfollow Cleaner",
@@ -21,7 +20,6 @@ const embedData = {
   }
 };
 
-// Backward compatibility
 const frameData = {
   ...embedData,
   button: {
@@ -35,16 +33,16 @@ const frameData = {
 
 export const metadata: Metadata = {
   title: "Unfollow Cleaner",
-  description: "Farcaster Takipçi Temizleme Aracı - Seni takip etmeyenleri bul ve temizle",
+  description: "Farcaster Follower Management Tool - Find and unfollow non-followers",
   
   openGraph: {
     title: "Unfollow Cleaner",
-    description: "Seni takip etmeyenleri bul ve temizle",
+    description: "Find and unfollow non-followers",
     images: [
       {
-        url: "https://unfollow-cleaner.vercel.app/og-image.png",
-        width: 1200,
-        height: 630,
+        url: "https://unfollow-cleaner.vercel.app/icon.png",
+        width: 512,
+        height: 512,
         alt: "Unfollow Cleaner",
       },
     ],
@@ -64,7 +62,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="tr">
+    <html lang="en">
       <body className={`${inter.className} bg-black text-white min-h-screen`}>
         <Providers>{children}</Providers>
       </body>
