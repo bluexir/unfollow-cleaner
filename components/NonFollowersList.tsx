@@ -19,35 +19,29 @@ interface NonFollower {
 interface NonFollowersListProps {
   userFid: number;
   signerUuid: string | null;
+  onSignerGranted: (uuid: string) => void;
 }
 
-export default function NonFollowersList({ userFid, signerUuid }: NonFollowersListProps) {
-  // --- STATE YÖNETİMİ ---
+export default function NonFollowersList({ userFid, signerUuid, onSignerGranted }: NonFollowersListProps) {
   const [nonFollowers, setNonFollowers] = useState<NonFollower[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isUnfollowing, setIsUnfollowing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // İstatistikler
   const [stats, setStats] = useState<{
     following: number;
     followers: number;
     nonFollowersCount: number;
   } | null>(null);
 
-  // Canlı Sayaç
   const [sessionCount, setSessionCount] = useState(0);
   const [showSharePopup, setShowSharePopup] = useState(false);
 
-  // Permission Modal
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<{ type: 'unfollow' | 'bulk', fids?: number[] } | null>(null);
   
-  // Dismissable Banner
   const [dismissedBanner, setDismissedBanner] = useState(false);
-
-  // SCORE RENK MANTIKLARI
   const getScoreColor = (score: number | null) => {
     if (score === null) return "text-gray-500";
     if (score >= 0.8) return "text-green-400";
@@ -62,7 +56,6 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
     return "⚠️";
   };
 
-  // --- VERİ ÇEKME (Mantık Güncellendi) ---
   useEffect(() => {
     fetchNonFollowers();
   }, [userFid]);
@@ -75,7 +68,6 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
       const data = await response.json();
       if (data.error) throw new Error(data.error);
 
-      // API zaten sıralı gönderiyor
       setNonFollowers(data.nonFollowers || []);
       if (data.stats) setStats(data.stats);
     } catch (error: any) {
@@ -85,7 +77,6 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
     }
   };
 
-  // --- SEÇİM MANTIKLARI (Aynı) ---
   const toggleSelectAll = () => {
     if (selectedUsers.size === nonFollowers.length) {
       setSelectedUsers(new Set());
@@ -101,7 +92,6 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
     setSelectedUsers(newSelected);
   };
 
-  // --- PROFİL GÖRÜNTÜLEME (Aynı) ---
   const handleViewProfile = (username: string, fid: number) => {
     try {
       if (typeof sdk !== 'undefined' && sdk.actions?.viewProfile) {
@@ -114,27 +104,24 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
     }
   };
 
-  // --- UNFOLLOW İŞLEMİ (Mantık Güncellendi) ---
   const doUnfollow = async (fids: number[]) => {
     if (fids.length === 0) return;
     setIsUnfollowing(true);
     setError(null);
 
     try {
-      // YENİ MANTIK: Tek seferde paket gönderim
       const response = await fetch('/api/unfollow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           signer_uuid: signerUuid,
-          target_fids: fids, // Dizi olarak gönderiyoruz
+          target_fids: fids,
         }),
       });
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'İşlem başarısız');
 
-      // PERFORMANS: Hızlı liste güncelleme
       const deletedFids = new Set(fids);
       const remaining = nonFollowers.filter(u => !deletedFids.has(u.fid));
       
@@ -178,13 +165,13 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
 
   const handlePermissionGranted = (uuid: string) => {
     setShowPermissionModal(false);
+    onSignerGranted(uuid);
     if (pendingAction?.fids) {
       doUnfollow(pendingAction.fids);
     }
     setPendingAction(null);
   };
 
-  // --- RENDER (SENİN ORİJİNAL TASARIMIN - DEĞİŞMEDİ) ---
   if (isLoading) {
     return (
       <div data-testid="nonfollowers-loading" className="flex flex-col items-center justify-center py-20 space-y-4">
@@ -213,7 +200,6 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
   return (
     <div data-testid="nonfollowers-screen" className="space-y-8 relative min-h-screen pb-24 animate-fade-up">
       
-      {/* PERMISSION BANNER */}
       {!signerUuid && !dismissedBanner && nonFollowers.length > 0 && (
         <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 flex items-center justify-between backdrop-blur-sm">
           <div className="flex items-center gap-3">
@@ -227,7 +213,6 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
         </div>
       )}
 
-      {/* 1. İSTATİSTİKLER */}
       {stats && (
         <div className="grid grid-cols-3 gap-px bg-gray-800/50 border border-gray-800 rounded-xl overflow-hidden backdrop-blur-md">
           <div className="bg-black/80 p-6 flex flex-col items-center justify-center hover:bg-white/5 transition-colors">
@@ -246,7 +231,6 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
         </div>
       )}
 
-      {/* 2. LİSTE BAŞLIĞI */}
       {nonFollowers.length > 0 ? (
         <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4 border-b border-gray-800 pb-4">
           <div>
@@ -283,7 +267,6 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
         </div>
       )}
 
-      {/* 3. KULLANICI LİSTESİ */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {nonFollowers.map((user) => (
           <div 
@@ -323,7 +306,6 @@ export default function NonFollowersList({ userFid, signerUuid }: NonFollowersLi
 
       <TipSection />
 
-      {/* 5. CANLI SAYAÇ */}
       {sessionCount > 0 && (
         <div className="fixed bottom-6 right-6 z-50 animate-bounce-in">
           <div className="bg-black border border-gray-700 shadow-2xl rounded-full pl-6 pr-2 py-2 flex items-center gap-6">
