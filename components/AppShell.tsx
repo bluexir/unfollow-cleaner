@@ -3,32 +3,18 @@
 import { useEffect, useState } from 'react';
 import sdk from '@farcaster/frame-sdk';
 import NonFollowersList from './NonFollowersList';
+import { useFarcaster } from '@/app/providers';
 
-const DEV_FID = 429973; // @bluexir
-const SIGNER_STORAGE_KEY = 'unfollow_cleaner_signer_uuid_v1';
+const DEV_FID = 429973;
 
 export default function AppShell({ user }: { user: { fid: number } }) {
   const userFid = user.fid;
+  const { signerUuid } = useFarcaster();
 
   const [isCheckingFollow, setIsCheckingFollow] = useState(true);
   const [isFollowingDev, setIsFollowingDev] = useState(false);
   const [followError, setFollowError] = useState<string | null>(null);
 
-  const [signerUuid, setSignerUuid] = useState<string | null>(null);
-  const [isCheckingSigner, setIsCheckingSigner] = useState(true);
-
-  // localStorage hatasını önlemek için state kullanıyoruz
-  const [storedSigner, setStoredSigner] = useState<string | null>(null);
-  const [signerRestoreAttempted, setSignerRestoreAttempted] = useState(false);
-
-  // 0) LocalStorage'dan güvenli okuma
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    setStoredSigner(window.localStorage.getItem(SIGNER_STORAGE_KEY));
-    setSignerRestoreAttempted(true);
-  }, []);
-
-  // 1) Follow gate (senin FID bypass)
   useEffect(() => {
     let cancelled = false;
 
@@ -36,7 +22,6 @@ export default function AppShell({ user }: { user: { fid: number } }) {
       setIsCheckingFollow(true);
       setFollowError(null);
 
-      // Admin bypass
       if (userFid === DEV_FID) {
         if (!cancelled) {
           setIsFollowingDev(true);
@@ -72,76 +57,6 @@ export default function AppShell({ user }: { user: { fid: number } }) {
     };
   }, [userFid]);
 
-  // 2) Signer restore + verify (opsiyonel)
-  useEffect(() => {
-    let cancelled = false;
-
-    // localStorage okunmadan doğrulama yapma
-    if (!signerRestoreAttempted) return;
-
-    const verifySigner = async (uuid: string) => {
-      try {
-        const res = await fetch(`/api/check-signer?signer_uuid=${encodeURIComponent(uuid)}`);
-        const data = await res.json().catch(() => ({}));
-
-        // approved + fid match
-        if (res.ok && data?.status === 'approved' && data?.fid === userFid) {
-          return { ok: true as const };
-        }
-
-        // Eğer signer bulunamazsa (404) veya geçersizse
-        if (res.status === 404 || data?.status === 'not_found') {
-          return { ok: false as const, reason: 'not_found' as const };
-        }
-
-        return { ok: false as const, reason: 'not_approved' as const };
-      } catch {
-        return { ok: false as const, reason: 'network' as const };
-      }
-    };
-
-    const run = async () => {
-      setIsCheckingSigner(true);
-
-      if (!storedSigner) {
-        if (!cancelled) {
-          setSignerUuid(null);
-          setIsCheckingSigner(false);
-        }
-        return;
-      }
-
-      const result = await verifySigner(storedSigner);
-      if (!cancelled) {
-        if (result.ok) {
-          setSignerUuid(storedSigner);
-        } else {
-          // Eğer signer geçersizse, localStorage'dan sil
-          if (typeof window !== 'undefined') {
-            window.localStorage.removeItem(SIGNER_STORAGE_KEY);
-          }
-          setStoredSigner(null);
-          setSignerUuid(null);
-        }
-        setIsCheckingSigner(false);
-      }
-    };
-
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [storedSigner, userFid, signerRestoreAttempted]);
-
-  // Signer granted callback
-  const handleSignerGranted = (uuid: string) => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(SIGNER_STORAGE_KEY, uuid);
-    }
-    setStoredSigner(uuid);
-    setSignerUuid(uuid);
-  };
-
   const openDevProfile = () => {
     try {
       sdk.actions.viewProfile({ fid: DEV_FID });
@@ -150,7 +65,7 @@ export default function AppShell({ user }: { user: { fid: number } }) {
     }
   };
 
-  if (isCheckingFollow || isCheckingSigner) {
+  if (isCheckingFollow) {
     return (
       <div data-testid="app-shell-loading" className="flex flex-col items-center justify-center min-h-[70vh] px-6">
         <div className="loader mb-4" />
@@ -159,7 +74,6 @@ export default function AppShell({ user }: { user: { fid: number } }) {
     );
   }
 
-  // Follow gate
   if (!isFollowingDev) {
     return (
       <div data-testid="follow-gate-screen" className="px-4 pt-6 pb-12 max-w-md mx-auto animate-fade-up">
@@ -169,9 +83,9 @@ export default function AppShell({ user }: { user: { fid: number } }) {
               <span className="text-purple-300 text-xl">🔒</span>
             </div>
             <div className="flex-1">
-              <h1 className="text-xl font-bold text-white">Listeyi açmak için takip şart</h1>
+              <h1 className="text-xl font-bold text-white">Follow Required</h1>
               <p className="text-gray-400 text-sm mt-1 leading-relaxed">
-                Bu aracı kullanmak için <span className="text-purple-300 font-semibold">@bluexir</span> hesabını takip et.
+                To use this tool, follow <span className="text-purple-300 font-semibold">@bluexir</span>.
               </p>
               {followError && (
                 <p className="text-red-400 text-xs mt-3 font-mono bg-red-500/10 border border-red-500/20 p-3 rounded-lg">
@@ -184,14 +98,14 @@ export default function AppShell({ user }: { user: { fid: number } }) {
                   onClick={openDevProfile}
                   className="bg-[#7C65C1] hover:bg-[#6952a3] text-white py-3 px-6 rounded-xl font-bold shadow-lg shadow-purple-900/20 transition-colors active:scale-[0.99]"
                 >
-                  @bluexir Takip Et
+                  Follow @bluexir
                 </button>
                 <button
                   data-testid="follow-gate-refresh-button"
                   onClick={() => window.location.reload()}
                   className="text-xs text-gray-500 hover:text-white underline decoration-dashed"
                 >
-                  Takip ettim, yenile
+                  I followed, refresh
                 </button>
               </div>
             </div>
@@ -201,12 +115,11 @@ export default function AppShell({ user }: { user: { fid: number } }) {
     );
   }
 
-  // Main app (signer artık opsiyonel)
   return (
     <div data-testid="app-shell-main" className="px-4 pt-6 max-w-3xl mx-auto animate-fade-up">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">Unfollow Cleaner</h1>
-        <p className="text-gray-500 text-sm mt-1">Seni takip etmeyenleri bul, seç ve tek tuşla temizle.</p>
+        <p className="text-gray-500 text-sm mt-1">Find non-followers and clean up with one tap.</p>
       </div>
 
       <NonFollowersList userFid={userFid} signerUuid={signerUuid} />
