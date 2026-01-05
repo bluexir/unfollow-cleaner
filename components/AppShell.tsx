@@ -3,18 +3,31 @@
 import { useEffect, useState } from 'react';
 import sdk from '@farcaster/frame-sdk';
 import NonFollowersList from './NonFollowersList';
-import { useFarcaster } from '@/app/providers';
 
 const DEV_FID = 429973;
+const SIGNER_STORAGE_KEY = 'unfollow_cleaner_signer_uuid_v1';
 
 export default function AppShell({ user }: { user: { fid: number } }) {
   const userFid = user.fid;
-  const { signerUuid } = useFarcaster();
 
   const [isCheckingFollow, setIsCheckingFollow] = useState(true);
   const [isFollowingDev, setIsFollowingDev] = useState(false);
   const [followError, setFollowError] = useState<string | null>(null);
 
+  const [signerUuid, setSignerUuid] = useState<string | null>(null);
+  const [isCheckingSigner, setIsCheckingSigner] = useState(true);
+
+  const [storedSigner, setStoredSigner] = useState<string | null>(null);
+  const [signerRestoreAttempted, setSignerRestoreAttempted] = useState(false);
+
+  // 0) LocalStorage'dan güvenli okuma
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setStoredSigner(window.localStorage.getItem(SIGNER_STORAGE_KEY));
+    setSignerRestoreAttempted(true);
+  }, []);
+
+  // 1) Follow gate
   useEffect(() => {
     let cancelled = false;
 
@@ -57,6 +70,71 @@ export default function AppShell({ user }: { user: { fid: number } }) {
     };
   }, [userFid]);
 
+  // 2) Signer restore + verify
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!signerRestoreAttempted) return;
+
+    const verifySigner = async (uuid: string) => {
+      try {
+        const res = await fetch(`/api/check-signer?signer_uuid=${encodeURIComponent(uuid)}`);
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok && data?.status === 'approved' && data?.fid === userFid) {
+          return { ok: true as const };
+        }
+
+        if (res.status === 404 || data?.status === 'not_found') {
+          return { ok: false as const, reason: 'not_found' as const };
+        }
+
+        return { ok: false as const, reason: 'not_approved' as const };
+      } catch {
+        return { ok: false as const, reason: 'network' as const };
+      }
+    };
+
+    const run = async () => {
+      setIsCheckingSigner(true);
+
+      if (!storedSigner) {
+        if (!cancelled) {
+          setSignerUuid(null);
+          setIsCheckingSigner(false);
+        }
+        return;
+      }
+
+      const result = await verifySigner(storedSigner);
+      if (!cancelled) {
+        if (result.ok) {
+          setSignerUuid(storedSigner);
+        } else {
+          if (typeof window !== 'undefined') {
+            window.localStorage.removeItem(SIGNER_STORAGE_KEY);
+          }
+          setStoredSigner(null);
+          setSignerUuid(null);
+        }
+        setIsCheckingSigner(false);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [storedSigner, userFid, signerRestoreAttempted]);
+
+  const handleSignerGranted = (uuid: string) => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(SIGNER_STORAGE_KEY, uuid);
+    }
+    setStoredSigner(uuid);
+    setSignerUuid(uuid);
+  };
+
   const openDevProfile = () => {
     try {
       sdk.actions.viewProfile({ fid: DEV_FID });
@@ -65,7 +143,7 @@ export default function AppShell({ user }: { user: { fid: number } }) {
     }
   };
 
-  if (isCheckingFollow) {
+  if (isCheckingFollow || isCheckingSigner) {
     return (
       <div data-testid="app-shell-loading" className="flex flex-col items-center justify-center min-h-[70vh] px-6">
         <div className="loader mb-4" />
@@ -122,7 +200,7 @@ export default function AppShell({ user }: { user: { fid: number } }) {
         <p className="text-gray-500 text-sm mt-1">Find non-followers and clean up with one tap.</p>
       </div>
 
-      <NonFollowersList userFid={userFid} signerUuid={signerUuid} />
+      <NonFollowersList userFid={userFid} signerUuid={signerUuid} onSignerGranted={handleSignerGranted} />
     </div>
   );
 }
