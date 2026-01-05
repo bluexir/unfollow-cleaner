@@ -60,45 +60,17 @@ export function Providers({ children }: { children: ReactNode }) {
     try {
       console.log("🔐 [AUTH] Sign in başlatılıyor...");
 
-      // 1. Nonce al
-      const nonceRes = await fetch('/api/auth/nonce');
-      const nonceData = await nonceRes.json();
+      // Mini App SDK direkt signer_uuid verir!
+      const result = await sdk.actions.signIn();
       
-      if (!nonceRes.ok || !nonceData.nonce) {
-        throw new Error('Nonce alınamadı');
+      if (!result?.signer_uuid) {
+        throw new Error('Signer UUID alınamadı');
       }
 
-      console.log("✅ [AUTH] Nonce alındı");
+      console.log("✅ [AUTH] Signer UUID alındı:", result.signer_uuid);
 
-      // 2. SDK ile sign in
-      const signInResult = await sdk.actions.signIn({ nonce: nonceData.nonce });
-      
-      if (!signInResult?.message || !signInResult?.signature) {
-        throw new Error('Sign in başarısız');
-      }
-
-      console.log("✅ [AUTH] Sign in başarılı");
-
-      // 3. Signers al
-      const signersRes = await fetch('/api/auth/signers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: signInResult.message,
-          signature: signInResult.signature
-        })
-      });
-
-      const signersData = await signersRes.json();
-
-      if (!signersRes.ok || !signersData.signer_uuid) {
-        throw new Error(signersData.error || 'Signer alınamadı');
-      }
-
-      console.log("✅ [AUTH] Signer UUID alındı:", signersData.signer_uuid);
-
-      setSignerUuid(signersData.signer_uuid);
-      return signersData.signer_uuid;
+      setSignerUuid(result.signer_uuid);
+      return result.signer_uuid;
 
     } catch (error: any) {
       console.error("❌ [AUTH] Hata:", error);
