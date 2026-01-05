@@ -19,19 +19,14 @@ type FrameContext = Awaited<typeof sdk.context>;
 const FarcasterContext = createContext<{ 
   context: FrameContext | undefined; 
   isSDKLoaded: boolean;
-  signerUuid: string | null;
-  requestSignIn: () => Promise<string | null>;
 }>({
   context: undefined,
   isSDKLoaded: false,
-  signerUuid: null,
-  requestSignIn: async () => null,
 });
 
 export function Providers({ children }: { children: ReactNode }) {
   const [context, setContext] = useState<FrameContext>();
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
-  const [signerUuid, setSignerUuid] = useState<string | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -56,36 +51,12 @@ export function Providers({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const requestSignIn = async (): Promise<string | null> => {
-    try {
-      console.log("🔐 [AUTH] Sign in başlatılıyor...");
-
-      // Mini App SDK direkt signer_uuid verir!
-      const result = await sdk.actions.signIn();
-      
-      if (!result?.signer_uuid) {
-        throw new Error('Signer UUID alınamadı');
-      }
-
-      console.log("✅ [AUTH] Signer UUID alındı:", result.signer_uuid);
-
-      setSignerUuid(result.signer_uuid);
-      return result.signer_uuid;
-
-    } catch (error: any) {
-      console.error("❌ [AUTH] Hata:", error);
-      return null;
-    }
-  };
-
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <FarcasterContext.Provider value={{ 
           context, 
-          isSDKLoaded, 
-          signerUuid,
-          requestSignIn 
+          isSDKLoaded
         }}>
           {children}
         </FarcasterContext.Provider>
