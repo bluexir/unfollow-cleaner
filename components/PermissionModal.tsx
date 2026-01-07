@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useFarcaster } from '@/app/providers';
+import { useEffect, useRef, useState } from 'react';
+import sdk from '@farcaster/frame-sdk';
 
 interface PermissionModalProps {
   userFid: number;
@@ -10,27 +10,95 @@ interface PermissionModalProps {
 }
 
 export default function PermissionModal({ userFid, onPermissionGranted, onClose }: PermissionModalProps) {
-  const { requestSignIn } = useFarcaster();
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [signerData, setSignerData] = useState<{ signer_uuid: string; deep_link: string } | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const intervalRef = useRef<number | null>(null);
+  const timeoutRef = useRef<number | null>(null);
 
-  const handleSignIn = async () => {
-    setIsProcessing(true);
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) window.clearInterval(intervalRef.current);
+      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  const createSigner = async () => {
+    setIsCreating(true);
     setError(null);
 
     try {
-      const signerUuid = await requestSignIn();
+      const response = await fetch('/api/create-signer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fid: userFid }),
+      });
 
-      if (!signerUuid) {
-        throw new Error('Sign in failed. Please try again.');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Signer oluşturulamadı');
       }
 
-      onPermissionGranted(signerUuid);
+      if (!data?.signer_uuid || !data?.deep_link) {
+        throw new Error('Eksik signer verisi döndü');
+      }
+
+      setSignerData({ signer_uuid: data.signer_uuid, deep_link: data.deep_link });
+
+      // Warpcast içinde approval ekranını aç
+      try {
+        await sdk.actions.openUrl(data.deep_link);
+      } catch {
+        window.open(data.deep_link, '_blank');
+      }
+
+      startPolling(data.signer_uuid);
     } catch (err: any) {
-      setError(err?.message || 'Authentication failed. Please try again.');
+      setError(err?.message || 'Signer oluşturulamadı. Tekrar dene.');
     } finally {
-      setIsProcessing(false);
+      setIsCreating(false);
     }
+  };
+
+  const startPolling = (signerUuid: string) => {
+    setIsChecking(true);
+
+    if (intervalRef.current) window.clearInterval(intervalRef.current);
+    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+
+    intervalRef.current = window.setInterval(async () => {
+      try {
+        const response = await fetch(`/api/check-signer?signer_uuid=${encodeURIComponent(signerUuid)}`);
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok && data?.status === 'approved' && data?.fid === userFid) {
+          if (intervalRef.current) window.clearInterval(intervalRef.current);
+          setIsChecking(false);
+          onPermissionGranted(signerUuid);
+          return;
+        }
+
+        if (response.status === 404 || data?.status === 'not_found') {
+          throw new Error('İzin linki süresi dolmuş. Tekrar "İzin Ver" ile yeni link oluştur.');
+        }
+
+        if (response.ok && data?.status === 'revoked') {
+          throw new Error('İzin iptal edilmiş. Yeniden deneyin.');
+        }
+      } catch (err: any) {
+        setError(err?.message || 'İzin kontrolünde hata oluştu');
+        if (intervalRef.current) window.clearInterval(intervalRef.current);
+        setIsChecking(false);
+      }
+    }, 2000);
+
+    timeoutRef.current = window.setTimeout(() => {
+      if (intervalRef.current) window.clearInterval(intervalRef.current);
+      setIsChecking(false);
+      setError('Onay çok uzun sürdü. Warpcast penceresinden onaylayıp tekrar deneyin.');
+    }, 120000);
   };
 
   return (
@@ -39,7 +107,7 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
       onClick={onClose}
     >
       <div 
-        className="bg-[#1c1f2e] border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl relative"
+        className="bg-[#1c1f2e] border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -54,11 +122,13 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
         </div>
 
         <h2 className="text-xl font-bold text-white text-center mb-2">
-          Permission Required
+          {isChecking ? 'Waiting for Approval...' : 'Permission Required'}
         </h2>
 
         <p className="text-gray-400 text-sm text-center leading-relaxed mb-6">
-          To unfollow users, you need to authenticate once. This is secure and handled by Farcaster.
+          {isChecking
+            ? 'Waiting for approval in Warpcast. Click "Approve" in the opened screen.'
+            : 'To unfollow users, you need to approve once in Warpcast. A small gas fee (~$0.05) will be paid from your wallet.'}
         </p>
 
         {error && (
@@ -67,29 +137,56 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
           </div>
         )}
 
-        <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            disabled={isProcessing}
-            className="flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white font-bold px-6 py-3 rounded-xl transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSignIn}
-            disabled={isProcessing}
-            className="flex-1 bg-[#7C65C1] hover:bg-[#6952a3] disabled:opacity-50 text-white font-bold px-6 py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
-          >
-            {isProcessing ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>Processing...</span>
-              </>
-            ) : (
-              'Authorize'
-            )}
-          </button>
-        </div>
+        {!signerData && !isCreating && (
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold px-6 py-3 rounded-xl transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={createSigner}
+              className="flex-1 bg-[#7C65C1] hover:bg-[#6952a3] text-white font-bold px-6 py-3 rounded-xl transition-colors"
+            >
+              Authorize
+            </button>
+          </div>
+        )}
+
+        {isCreating && !signerData && (
+          <div className="flex items-center justify-center gap-2 py-3">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-400"></div>
+            <span className="text-gray-400 text-sm">Preparing authorization screen...</span>
+          </div>
+        )}
+
+        {isChecking && signerData && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-center gap-2 py-3">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-400"></div>
+              <span className="text-gray-300 text-sm font-medium">Waiting for approval...</span>
+            </div>
+            
+            <p className="text-xs text-gray-500 text-center">
+              Approve in the opened Warpcast screen. If it didn't open, try again below.
+            </p>
+
+            <button
+              onClick={async () => {
+                if (!signerData?.deep_link) return;
+                try {
+                  await sdk.actions.openUrl(signerData.deep_link);
+                } catch {
+                  window.open(signerData.deep_link, '_blank');
+                }
+              }}
+              className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold px-4 py-3 rounded-xl transition-colors"
+            >
+              Open in Warpcast Again
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
