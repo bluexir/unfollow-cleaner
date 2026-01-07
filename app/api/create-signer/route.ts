@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neynarClient } from '@/lib/neynar';
 
+const APP_FID = 429973; // bluexir FID
+
 export async function POST(req: NextRequest) {
   try {
     const { fid } = await req.json();
@@ -14,15 +16,18 @@ export async function POST(req: NextRequest) {
 
     console.log('[CREATE-SIGNER] Signer oluşturuluyor, FID:', fid);
 
-    // 1. Signer oluştur
     const signer = await neynarClient.createSigner();
 
-    console.log('[CREATE-SIGNER] FULL RESPONSE:', JSON.stringify(signer, null, 2));
     console.log('[CREATE-SIGNER] Signer UUID:', signer.signer_uuid);
+
+    // MANUEL DEEP LINK OLUŞTUR
+    const deep_link = `https://client.farcaster.xyz/deeplinks/signed-key-request?key=${signer.public_key}&requestFid=${APP_FID}`;
+
+    console.log('[CREATE-SIGNER] Deep link:', deep_link);
 
     return NextResponse.json({
       signer_uuid: signer.signer_uuid,
-      deep_link: signer.signer_approval_url
+      deep_link: deep_link
     });
 
   } catch (error: any) {
