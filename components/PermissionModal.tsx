@@ -47,10 +47,12 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
 
       setSignerData({ signer_uuid: data.signer_uuid, deep_link: data.deep_link });
 
-      // Warpcast içinde approval ekranını aç
+      // Mini App içinde aç (yeni sekme değil)
       try {
         await sdk.actions.openUrl(data.deep_link);
-      } catch {
+      } catch (err) {
+        console.error('openUrl failed:', err);
+        // Fallback: yeni sekme
         window.open(data.deep_link, '_blank');
       }
 
@@ -92,7 +94,7 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
         if (intervalRef.current) window.clearInterval(intervalRef.current);
         setIsChecking(false);
       }
-    }, 2000);
+    }, 5000); // 5 saniye
 
     timeoutRef.current = window.setTimeout(() => {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
@@ -107,7 +109,7 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
       onClick={onClose}
     >
       <div 
-        className="bg-[#1c1f2e] border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl"
+        className="bg-[#1c1f2e] border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl relative"
         onClick={(e) => e.stopPropagation()}
       >
         <button
