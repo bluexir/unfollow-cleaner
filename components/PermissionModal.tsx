@@ -10,7 +10,8 @@ interface PermissionModalProps {
 }
 
 export default function PermissionModal({ userFid, onPermissionGranted, onClose }: PermissionModalProps) {
-  const [signerData, setSignerData] = useState<{ signer_uuid: string; deep_link: string } | null>(null);
+  // Değişken ismini backend ile uyumlu hale getirdik: signer_approval_url
+  const [signerData, setSignerData] = useState<{ signer_uuid: string; signer_approval_url: string } | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,19 +42,22 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
         throw new Error(data?.error || 'Signer oluşturulamadı');
       }
 
-      if (!data?.signer_uuid || !data?.deep_link) {
+      // Backend'den gelen 'signer_approval_url' bilgisini kontrol ediyoruz
+      if (!data?.signer_uuid || !data?.signer_approval_url) {
         throw new Error('Eksik signer verisi döndü');
       }
 
-      setSignerData({ signer_uuid: data.signer_uuid, deep_link: data.deep_link });
+      setSignerData({ 
+        signer_uuid: data.signer_uuid, 
+        signer_approval_url: data.signer_approval_url 
+      });
 
-      // Mini App içinde aç (yeni sekme değil)
+      // Mini App içinde URL'yi açıyoruz
       try {
-        await sdk.actions.openUrl(data.deep_link);
+        await sdk.actions.openUrl(data.signer_approval_url);
       } catch (err) {
         console.error('openUrl failed:', err);
-        // Fallback: yeni sekme
-        window.open(data.deep_link, '_blank');
+        window.open(data.signer_approval_url, '_blank');
       }
 
       startPolling(data.signer_uuid);
@@ -75,7 +79,8 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
         const response = await fetch(`/api/check-signer?signer_uuid=${encodeURIComponent(signerUuid)}`);
         const data = await response.json().catch(() => ({}));
 
-        if (response.ok && data?.status === 'approved' && data?.fid === userFid) {
+        // Durum 'approved' olduğunda ve FID eşleştiğinde işlemi tamamla
+        if (response.ok && data?.status === 'approved' && Number(data?.fid) === userFid) {
           if (intervalRef.current) window.clearInterval(intervalRef.current);
           setIsChecking(false);
           onPermissionGranted(signerUuid);
@@ -83,7 +88,7 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
         }
 
         if (response.status === 404 || data?.status === 'not_found') {
-          throw new Error('İzin linki süresi dolmuş. Tekrar "İzin Ver" ile yeni link oluştur.');
+          throw new Error('İzin linki süresi dolmuş. Tekrar deneyin.');
         }
 
         if (response.ok && data?.status === 'revoked') {
@@ -94,13 +99,13 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
         if (intervalRef.current) window.clearInterval(intervalRef.current);
         setIsChecking(false);
       }
-    }, 5000); // 5 saniye
+    }, 3000); // 3 saniye (daha akıcı bir deneyim için)
 
     timeoutRef.current = window.setTimeout(() => {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
       setIsChecking(false);
-      setError('Onay çok uzun sürdü. Warpcast penceresinden onaylayıp tekrar deneyin.');
-    }, 120000);
+      setError('Onay çok uzun sürdü. Lütfen tekrar deneyin.');
+    }, 180000); // 3 dakika
   };
 
   return (
@@ -130,7 +135,7 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
         <p className="text-gray-400 text-sm text-center leading-relaxed mb-6">
           {isChecking
             ? 'Waiting for approval in Warpcast. Click "Approve" in the opened screen.'
-            : 'To unfollow users, you need to approve once in Warpcast. A small gas fee (~$0.05) will be paid from your wallet.'}
+            : 'To unfollow users, you need to approve once in Warpcast. A small gas fee will be paid from your wallet.'}
         </p>
 
         {error && (
@@ -170,17 +175,13 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
               <span className="text-gray-300 text-sm font-medium">Waiting for approval...</span>
             </div>
             
-            <p className="text-xs text-gray-500 text-center">
-              Approve in the opened Warpcast screen. If it didn't open, try again below.
-            </p>
-
             <button
               onClick={async () => {
-                if (!signerData?.deep_link) return;
+                if (!signerData?.signer_approval_url) return;
                 try {
-                  await sdk.actions.openUrl(signerData.deep_link);
+                  await sdk.actions.openUrl(signerData.signer_approval_url);
                 } catch {
-                  window.open(signerData.deep_link, '_blank');
+                  window.open(signerData.signer_approval_url, '_blank');
                 }
               }}
               className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold px-4 py-3 rounded-xl transition-colors"
