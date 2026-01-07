@@ -1,39 +1,46 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { neynarClient } from '@/lib/neynar';
 
-const APP_FID = 429973; // bluexir FID
-
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const { fid } = await req.json();
+    const searchParams = req.nextUrl.searchParams;
+    const signer_uuid = searchParams.get('signer_uuid');
 
-    if (!fid) {
+    if (!signer_uuid) {
       return NextResponse.json(
-        { error: 'FID required' },
+        { error: 'signer_uuid required' },
         { status: 400 }
       );
     }
 
-    console.log('[CREATE-SIGNER] Signer oluşturuluyor, FID:', fid);
+    console.log('[CHECK-SIGNER] Kontrol ediliyor:', signer_uuid);
 
-    const signer = await neynarClient.createSigner();
+    // SDK v3 syntax: camelCase!
+    const signer = await neynarClient.lookupSigner({
+      signerUuid: signer_uuid
+    });
 
-    console.log('[CREATE-SIGNER] Signer UUID:', signer.signer_uuid);
-
-    // MANUEL DEEP LINK OLUŞTUR
-    const deep_link = `https://client.farcaster.xyz/deeplinks/signed-key-request?key=${signer.public_key}&requestFid=${APP_FID}`;
-
-    console.log('[CREATE-SIGNER] Deep link:', deep_link);
+    console.log('[CHECK-SIGNER] Status:', signer.status);
 
     return NextResponse.json({
-      signer_uuid: signer.signer_uuid,
-      deep_link: deep_link
+      status: signer.status,
+      fid: signer.fid
     });
 
   } catch (error: any) {
-    console.error('[CREATE-SIGNER] Hata:', error);
+    console.error('[CHECK-SIGNER] Hata:', error);
+    
+    if (error.message?.includes('not found') || error.message?.includes('404')) {
+      return NextResponse.json(
+        { status: 'not_found' },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json(
-      { error: error.message || 'Signer creation failed' },
+      { error: error.message || 'Check signer failed' },
       { status: 500 }
     );
   }
