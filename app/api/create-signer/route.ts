@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
     // 1. Signer oluştur
     const signer = await neynarClient.createSigner();
 
+    console.log('[CREATE-SIGNER] FULL RESPONSE:', JSON.stringify(signer, null, 2));
     console.log('[CREATE-SIGNER] Signer UUID:', signer.signer_uuid);
 
     return NextResponse.json({
