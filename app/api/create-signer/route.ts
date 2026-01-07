@@ -4,27 +4,30 @@ import { NextResponse } from 'next/server';
 import { neynarClient } from '@/lib/neynar';
 import { mnemonicToAccount } from 'viem/accounts';
 
+// Senin FID numaran (bluexir)
 const APP_FID = 429973; 
 
 export async function POST() {
   try {
+    // 1. Vercel'deki 12 kelimeyi alıyoruz
     const mnemonic = process.env.FARCASTER_DEVELOPER_MNEMONIC;
     if (!mnemonic) {
       throw new Error('Vercel Variables kısmında FARCASTER_DEVELOPER_MNEMONIC bulunamadı.');
     }
 
-    // 1. Yeni Signer oluştur
+    // 2. Neynar'dan ham bir Signer (anahtar) oluşturuyoruz
     const signer = await neynarClient.createSigner();
     
-    const deadline = Math.floor(Date.now() / 1000) + 86400; // 24 saat geçerli
+    // 3. İmzanın geçerlilik süresi (Şu andan itibaren 24 saat)
+    const deadline = Math.floor(Date.now() / 1000) + 86400;
 
-    // 2. viem ile dijital imza üret
+    // 4. viem kütüphanesi ile 12 kelimeyi kullanarak EIP-712 imzasını atıyoruz
     const account = mnemonicToAccount(mnemonic);
     const signature = await account.signTypedData({
       domain: {
         name: "Farcaster Verify Key",
         version: "1",
-        chainId: 10,
+        chainId: 10, // OP Mainnet
         verifyingContract: "0x00000000fc7004726058f5509a5326c79561d871",
       },
       types: {
@@ -42,17 +45,19 @@ export async function POST() {
       },
     });
 
-    // 3. İmzalı kayıt işlemini yap (URL buradan gelecek)
+    // 5. İmzalı kayıt işlemini yapıyoruz
     const registeredSigner = await neynarClient.registerSignedKey({
       signerUuid: signer.signerUuid,
       appFid: APP_FID,
       deadline: deadline,
       signature: signature,
+      // DÜZELTME: Gaz ücretini KULLANICI öder, senin kredilerin korunur.
       sponsor: {
-        sponsoredByNeynar: true
+        sponsoredByNeynar: false
       }
     });
 
+    // 6. Sonuç: Onay linki kullanıcıya iletilmek üzere hazır
     return NextResponse.json({
       signer_uuid: registeredSigner.signerUuid,
       public_key: registeredSigner.publicKey,
