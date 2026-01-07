@@ -194,3 +194,4 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
     </div>
   );
 }
+
