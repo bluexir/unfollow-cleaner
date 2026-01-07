@@ -19,16 +19,6 @@ export async function POST(req: NextRequest) {
 
     console.log('[CREATE-SIGNER] Signer UUID:', signer.signer_uuid);
 
-    // 2. Register et (NEYNAR SPONSORED)
-    await neynarClient.registerSignedKey({
-      signer_uuid: signer.signer_uuid,
-      sponsor: {
-        sponsored_by_neynar: true
-      }
-    });
-
-    console.log('[CREATE-SIGNER] Register başarılı');
-
     return NextResponse.json({
       signer_uuid: signer.signer_uuid,
       deep_link: signer.signer_approval_url
