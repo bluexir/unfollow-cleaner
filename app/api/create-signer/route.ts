@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { neynarClient } from '@/lib/neynar';
 import { mnemonicToAccount } from 'viem/accounts';
 
-// Senin FID numaran
+// Senin FID numaran (bluexir)
 const APP_FID = 429973; 
 
 export async function POST() {
@@ -12,29 +12,25 @@ export async function POST() {
     console.log("--- SIGNER İŞLEMİ BAŞLATILDI ---");
 
     const mnemonic = process.env.FARCASTER_DEVELOPER_MNEMONIC?.trim();
-
     if (!mnemonic) {
-      return NextResponse.json(
-        { error: 'Mnemonic bulunamadı.' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Mnemonic bulunamadı.' }, { status: 500 });
     }
 
     // 1. Neynar'dan yeni Signer oluştur
     const signer = await neynarClient.createSigner();
-    console.log("[CREATE-SIGNER] Signer oluşturuldu:", signer.signerUuid);
+    
+    // KRİTİK DÜZELTME: Logda ve kodda artık snake_case (signer_uuid) kullanıyoruz
+    console.log("[CREATE-SIGNER] Signer başarıyla oluşturuldu. UUID:", signer.signer_uuid);
     
     const deadline = Math.floor(Date.now() / 1000) + 86400;
 
-    // 2. viem ile dijital imza üret (GROK DÜZELTMELERİ UYGULANDI)
+    // 2. viem ile dijital imza üret (Grok'un verileriyle güncellendi)
     const account = mnemonicToAccount(mnemonic);
     const signature = await account.signTypedData({
       domain: {
-        // DÜZELTME 1: Güncel Domain Name
         name: "Farcaster SignedKeyRequestValidator",
         version: "1",
         chainId: 10,
-        // DÜZELTME 2: Güncel Kontrat Adresi (...62c60553)
         verifyingContract: "0x00000000fc700472606ed4fa22623acf62c60553",
       },
       types: {
@@ -47,17 +43,18 @@ export async function POST() {
       primaryType: "SignedKeyRequest",
       message: {
         appFid: BigInt(APP_FID),
-        // DÜZELTME 3: public_key kullanımı (snake_case)
+        // DÜZELTME: signer.public_key (snake_case)
         key: signer.public_key as `0x${string}`,
         deadline: BigInt(deadline),
       },
     });
 
-    console.log("[CREATE-SIGNER] İmza başarıyla oluşturuldu.");
+    console.log("[CREATE-SIGNER] İmza oluşturuldu.");
 
-    // 3. İmzalı kayıt (Kullanıcı kendi gazını öder)
+    // 3. İmzalı kayıt işlemi
     const registeredSigner = await neynarClient.registerSignedKey({
-      signerUuid: signer.signerUuid,
+      // DÜZELTME: signer.signer_uuid (snake_case) değerini gönderiyoruz
+      signerUuid: signer.signer_uuid, 
       appFid: APP_FID,
       deadline: deadline,
       signature: signature,
@@ -67,17 +64,17 @@ export async function POST() {
     });
 
     return NextResponse.json({
-      signer_uuid: registeredSigner.signerUuid,
+      signer_uuid: registeredSigner.signer_uuid,
       public_key: registeredSigner.public_key,
       status: registeredSigner.status,
       signer_approval_url: registeredSigner.signerApprovalUrl
     });
 
   } catch (error: any) {
-    // Neynar'dan dönen detaylı hatayı loglarda görmek için:
-    console.error('[CREATE-SIGNER] HATA:', error.response?.data || error.message);
+    // Hatanın detayını loglarda görmek için detaylı çıktı:
+    console.error('[CREATE-SIGNER] HATA:', error.response?.data || error);
     return NextResponse.json(
-      { error: error.response?.data?.message || 'İmza doğrulanamadı' },
+      { error: error.response?.data?.message || 'İşlem başarısız' },
       { status: 400 }
     );
   }
