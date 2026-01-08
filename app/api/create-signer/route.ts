@@ -16,25 +16,24 @@ export async function POST() {
       return NextResponse.json({ error: 'Mnemonic bulunamadı.' }, { status: 500 });
     }
 
-    // 1. Mnemonic'ten hesap oluştur (24 kelimelik anahtarın burada devreye giriyor)
+    // 1. 24 Kelimelik Mnemonic ile hesabı oluştur
     const account = mnemonicToAccount(mnemonic);
     console.log("[CREATE-SIGNER] Kullanılan Adres:", account.address);
 
-    // 2. Neynar'dan yeni Signer oluştur
+    // 2. Neynar'dan yeni Signer (anahtar çifti) oluştur
     const signer = await neynarClient.createSigner();
-    console.log("[CREATE-SIGNER] Signer UUID:", signer.signer_uuid);
     
+    // 3. İmza için gerekli olan süreyi (deadline) ayarla
     const deadline = Math.floor(Date.now() / 1000) + 86400;
 
-    // 3. viem ile dijital imza üret (KRİTİK GÜNCELLEME)
+    // 4. EIP-712 Dijital İmzayı Üret (Farcaster Protokol Standartı)
     const signature = await account.signTypedData({
       domain: {
-        // İsim ve Kontrat adresi protokolün tam istediği formatta güncellendi
+        // EN KRİTİK KOMBİNASYON: Validator İsmi + KeyGateway Kontratı
         name: "Farcaster SignedKeyRequestValidator",
         version: "1",
         chainId: 10,
-        // Bu adres SignedKeyRequestValidator kontratının asıl adresidir
-        verifyingContract: "0x00000000fc958d4870da2a275baee692aa512e75",
+        verifyingContract: "0x00000000fc700472606ed4fa22623acf62c60553",
       },
       types: {
         SignedKeyRequest: [
@@ -53,8 +52,9 @@ export async function POST() {
 
     console.log("[CREATE-SIGNER] İmza başarıyla oluşturuldu.");
 
-    // 4. İmzalı kayıt işlemi
+    // 5. Neynar'a İmzalı Kaydı Gönder
     const registeredSigner = await neynarClient.registerSignedKey({
+      // Neynar SDK'nın beklediği field isimleri
       signerUuid: signer.signer_uuid, 
       appFid: APP_FID,
       deadline: deadline,
@@ -72,6 +72,7 @@ export async function POST() {
     });
 
   } catch (error: any) {
+    // Hatanın detayını tam olarak loglayalım
     console.error('[CREATE-SIGNER] HATA DETAYI:', error.response?.data || error);
     return NextResponse.json(
       { error: error.response?.data?.message || 'İmza doğrulanamadı' },
