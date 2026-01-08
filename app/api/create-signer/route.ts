@@ -16,16 +16,18 @@ export async function POST() {
       return NextResponse.json({ error: 'Mnemonic bulunamadı.' }, { status: 500 });
     }
 
-    // 1. Neynar'dan yeni Signer oluştur
+    // 1. Mnemonic'ten hesap oluştur ve ADRESİ LOGLA
+    const account = mnemonicToAccount(mnemonic);
+    console.log("[CREATE-SIGNER] Mnemonic'ten üretilen adres:", account.address);
+    console.log("[CREATE-SIGNER] Bu adres FID", APP_FID, "hesabının yetkili adresi mi?");
+
+    // 2. Neynar'dan yeni Signer oluştur
     const signer = await neynarClient.createSigner();
-    
-    // KRİTİK DÜZELTME: Logda ve kodda artık snake_case (signer_uuid) kullanıyoruz
-    console.log("[CREATE-SIGNER] Signer başarıyla oluşturuldu. UUID:", signer.signer_uuid);
+    console.log("[CREATE-SIGNER] Signer UUID:", signer.signer_uuid);
     
     const deadline = Math.floor(Date.now() / 1000) + 86400;
 
-    // 2. viem ile dijital imza üret (Grok'un verileriyle güncellendi)
-    const account = mnemonicToAccount(mnemonic);
+    // 3. viem ile dijital imza üret (Güncel protokol standartları)
     const signature = await account.signTypedData({
       domain: {
         name: "Farcaster SignedKeyRequestValidator",
@@ -43,7 +45,6 @@ export async function POST() {
       primaryType: "SignedKeyRequest",
       message: {
         appFid: BigInt(APP_FID),
-        // DÜZELTME: signer.public_key (snake_case)
         key: signer.public_key as `0x${string}`,
         deadline: BigInt(deadline),
       },
@@ -51,9 +52,8 @@ export async function POST() {
 
     console.log("[CREATE-SIGNER] İmza oluşturuldu.");
 
-    // 3. İmzalı kayıt işlemi
+    // 4. İmzalı kayıt işlemi (Kullanıcı gaz öder)
     const registeredSigner = await neynarClient.registerSignedKey({
-      // DÜZELTME: signer.signer_uuid (snake_case) değerini gönderiyoruz
       signerUuid: signer.signer_uuid, 
       appFid: APP_FID,
       deadline: deadline,
@@ -71,10 +71,10 @@ export async function POST() {
     });
 
   } catch (error: any) {
-    // Hatanın detayını loglarda görmek için detaylı çıktı:
-    console.error('[CREATE-SIGNER] HATA:', error.response?.data || error);
+    // Hatanın detayını tam olarak görelim:
+    console.error('[CREATE-SIGNER] HATA DETAYI:', error.response?.data || error);
     return NextResponse.json(
-      { error: error.response?.data?.message || 'İşlem başarısız' },
+      { error: error.response?.data?.message || 'İmza doğrulanamadı' },
       { status: 400 }
     );
   }
