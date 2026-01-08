@@ -9,36 +9,26 @@ const APP_FID = 429973;
 
 export async function POST() {
   try {
-    // 1. Vercel Logları için kontrol başlatıyoruz
-    console.log("--- SIGNER OLUŞTURMA BAŞLADI ---");
-    
-    // Değişkeni okuyoruz ve varsa başındaki/sonundaki boşlukları siliyoruz
+    console.log("--- SIGNER İŞLEMİ BAŞLATILDI ---");
+
+    // 1. Mnemonic'i Vercel'den çekiyoruz ve boşlukları temizliyoruz
     const mnemonic = process.env.FARCASTER_DEVELOPER_MNEMONIC?.trim();
 
-    // 2. Teknik Denetim: Değişken Vercel'de var mı?
     if (!mnemonic) {
-      console.error("KRİTİK HATA: FARCASTER_DEVELOPER_MNEMONIC çevresel değişkeni okunamadı!");
-      console.log("Mevcut Değişkenler Listesi (Güvenlik için sadece varlık kontrolü):", {
-        HAS_MNEMONIC: !!process.env.FARCASTER_DEVELOPER_MNEMONIC,
-        HAS_NEYNAR_KEY: !!process.env.NEYNAR_API_KEY,
-        NODE_ENV: process.env.NODE_ENV
-      });
-      
+      console.error("HATA: Vercel panelinde FARCASTER_DEVELOPER_MNEMONIC bulunamadı!");
       return NextResponse.json(
-        { error: 'Vercel Variables kısmında FARCASTER_DEVELOPER_MNEMONIC bulunamadı. Lütfen Redeploy yapın.' },
+        { error: 'Mnemonic bulunamadı. Lütfen Vercel Variables kısmını kontrol edin.' },
         { status: 500 }
       );
     }
 
-    console.log("Mnemonic başarıyla algılandı. Uzunluk:", mnemonic.split(' ').length, "kelime.");
-
-    // 3. Neynar'dan ham anahtar (Signer) oluştur
+    // 2. Neynar'dan ham anahtar (Signer) oluştur
     const signer = await neynarClient.createSigner();
-    console.log("Neynar Signer oluşturuldu. UUID:", signer.signerUuid);
     
-    const deadline = Math.floor(Date.now() / 1000) + 86400; // 24 saat geçerli
+    // 3. İmza süresi (24 saat)
+    const deadline = Math.floor(Date.now() / 1000) + 86400;
 
-    // 4. viem ile dijital imza üret
+    // 4. viem ile dijital imza üret (Mnemonic burada devreye giriyor)
     const account = mnemonicToAccount(mnemonic);
     const signature = await account.signTypedData({
       domain: {
@@ -62,22 +52,20 @@ export async function POST() {
       },
     });
 
-    console.log("Dijital imza (Signature) başarıyla üretildi.");
-
-    // 5. İmzalı kayıt işlemini yapıyoruz (Kullanıcı gaz öder)
+    // 5. İmzalı kayıt işlemi (Kullanıcı kendi gazını/warpsunu öder)
     const registeredSigner = await neynarClient.registerSignedKey({
       signerUuid: signer.signerUuid,
       appFid: APP_FID,
       deadline: deadline,
       signature: signature,
       sponsor: {
-        sponsoredByNeynar: false // Kullanıcı kendi gazını/warpsunu ödeyecek
+        sponsoredByNeynar: false
       }
     });
 
-    console.log("Signer kaydı tamamlandı. URL üretildi.");
+    console.log("Onay Linki Başarıyla Üretildi.");
 
-    // 6. Başarılı yanıt gönder
+    // 6. Frontend'e (PermissionModal) gereken verileri gönderiyoruz
     return NextResponse.json({
       signer_uuid: registeredSigner.signerUuid,
       public_key: registeredSigner.publicKey,
@@ -86,9 +74,9 @@ export async function POST() {
     });
 
   } catch (error: any) {
-    console.error('[CREATE-SIGNER] Sistemsel Hata:', error);
+    console.error('[CREATE-SIGNER] HATA:', error);
     return NextResponse.json(
-      { error: error.message || 'İmza işlemi sırasında hata oluştu' },
+      { error: error.message || 'İşlem başarısız' },
       { status: 500 }
     );
   }
