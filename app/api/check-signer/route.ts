@@ -17,8 +17,9 @@ export async function GET(req: NextRequest) {
 
     console.log('[CHECK-SIGNER] Kontrol ediliyor:', signer_uuid);
 
+    // SDK v3: camelCase!
     const signer = await neynarClient.lookupSigner({
-      signer_uuid
+      signerUuid: signer_uuid
     });
 
     console.log('[CHECK-SIGNER] Status:', signer.status);
