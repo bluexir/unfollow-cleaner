@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { neynarClient } from '@/lib/neynar';
 import { mnemonicToAccount } from 'viem/accounts';
 
-// Senin FID numaran (bluexir)
+// Senin hem kişisel hem uygulama FID numaran
 const APP_FID = 429973; 
 
 export async function POST() {
@@ -16,23 +16,23 @@ export async function POST() {
       return NextResponse.json({ error: 'Mnemonic bulunamadı.' }, { status: 500 });
     }
 
-    // 1. 24 Kelimelik Mnemonic ile hesabı oluştur
+    // 1. 24 Kelimelik Mnemonic ile "Tapu Sahibi" hesabı oluştur
     const account = mnemonicToAccount(mnemonic);
-    console.log("[CREATE-SIGNER] Kullanılan Adres:", account.address);
+    console.log("[CREATE-SIGNER] Yetkili Adres:", account.address);
 
-    // 2. Neynar'dan yeni Signer (anahtar çifti) oluştur
+    // 2. Neynar'dan yeni Signer oluştur
     const signer = await neynarClient.createSigner();
     
-    // 3. İmza için gerekli olan süreyi (deadline) ayarla
+    // 3. İmza son kullanma tarihi (24 saat sonrası)
     const deadline = Math.floor(Date.now() / 1000) + 86400;
 
-    // 4. EIP-712 Dijital İmzayı Üret (Farcaster Protokol Standartı)
+    // 4. EIP-712 Standart imzasını üret
     const signature = await account.signTypedData({
       domain: {
-        // EN KRİTİK KOMBİNASYON: Validator İsmi + KeyGateway Kontratı
-        name: "Farcaster SignedKeyRequestValidator",
+        // EN STANDART KOMBİNASYON
+        name: "Farcaster", 
         version: "1",
-        chainId: 10,
+        chainId: 10, // Optimism Mainnet
         verifyingContract: "0x00000000fc700472606ed4fa22623acf62c60553",
       },
       types: {
@@ -52,9 +52,8 @@ export async function POST() {
 
     console.log("[CREATE-SIGNER] İmza başarıyla oluşturuldu.");
 
-    // 5. Neynar'a İmzalı Kaydı Gönder
+    // 5. Neynar'a imzayı ve signer_uuid'yi gönder
     const registeredSigner = await neynarClient.registerSignedKey({
-      // Neynar SDK'nın beklediği field isimleri
       signerUuid: signer.signer_uuid, 
       appFid: APP_FID,
       deadline: deadline,
@@ -72,10 +71,10 @@ export async function POST() {
     });
 
   } catch (error: any) {
-    // Hatanın detayını tam olarak loglayalım
+    // Hatanın tam içeriğini loglarda görelim
     console.error('[CREATE-SIGNER] HATA DETAYI:', error.response?.data || error);
     return NextResponse.json(
-      { error: error.response?.data?.message || 'İmza doğrulanamadı' },
+      { error: error.response?.data?.message || 'İşlem başarısız' },
       { status: 400 }
     );
   }
