@@ -4,18 +4,27 @@ import { neynarClient } from '@/lib/neynar';
 export async function POST(req: Request) {
   try {
     const { targetFid } = await req.json();
+    
+    // Vercel üzerindeki UUID
     const signerUuid = process.env.FARCASTER_SIGNER_UUID;
 
     if (!signerUuid) {
-      return NextResponse.json({ error: 'UUID eksik' }, { status: 500 });
+      console.error("[UNFOLLOW] HATA: Signer UUID bulunamadı.");
+      return NextResponse.json({ error: 'Signer UUID eksik.' }, { status: 500 });
     }
 
-    // Doğrudan takipten çıkma emri
-    await neynarClient.deleteFollow(signerUuid, [targetFid]);
+    console.log(`[UNFOLLOW] İşlem deneniyor. Target FID: ${targetFid}, Signer: ${signerUuid}`);
 
-    return NextResponse.json({ success: true });
+    // Hata aldığımız o satır
+    const response = await neynarClient.deleteFollow(signerUuid, [targetFid]);
+
+    return NextResponse.json({ success: true, response });
   } catch (error: any) {
-    console.error('Unfollow Hatası:', error.response?.data || error);
-    return NextResponse.json({ error: 'İşlem başarısız' }, { status: 400 });
+    // Aldığımız o meşhur hata detayları
+    console.error('[UNFOLLOW] HATA DETAYI:', error.response?.data || error.message);
+    return NextResponse.json(
+      { error: error.response?.data?.message || 'İşlem başarısız oldu' },
+      { status: 400 }
+    );
   }
 }
