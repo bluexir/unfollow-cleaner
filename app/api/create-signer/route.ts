@@ -4,29 +4,17 @@ import { NextResponse } from 'next/server';
 import { neynarClient } from '@/lib/neynar';
 import { mnemonicToAccount } from 'viem/accounts';
 
-// Neynar'ın resmi App FID'si (Kendi FID'in kayıtlı olmadığı için bunu kullanmalıyız)
 const NEYNAR_APP_FID = 24; 
 
 export async function POST() {
   try {
-    console.log("--- SIGNER İŞLEMİ BAŞLATILDI ---");
-
     const mnemonic = process.env.FARCASTER_DEVELOPER_MNEMONIC?.trim();
-    if (!mnemonic) {
-      return NextResponse.json({ error: 'Mnemonic (24 kelime) bulunamadı.' }, { status: 500 });
-    }
+    if (!mnemonic) return NextResponse.json({ error: 'Mnemonic yok.' }, { status: 500 });
 
-    // 1. 24 Kelimelik Mnemonic ile yetkili hesabı oluştur
     const account = mnemonicToAccount(mnemonic);
-    console.log("[CREATE-SIGNER] Yetkili Adres (Custody):", account.address);
-
-    // 2. Neynar'dan yeni Signer oluştur
     const signer = await neynarClient.createSigner();
-    
-    // 3. Deadline (Süreyi 1 saate çekiyoruz - Daha güvenli)
     const deadline = Math.floor(Date.now() / 1000) + 3600;
 
-    // 4. EIP-712 İmzası (Farcaster Standart Formatı)
     const signature = await account.signTypedData({
       domain: {
         name: "Farcaster",
@@ -49,15 +37,11 @@ export async function POST() {
       },
     });
 
-    console.log("[CREATE-SIGNER] İmza başarıyla oluşturuldu.");
-
-    // 5. Neynar'a İmzalı Kaydı Gönder (KRİTİK: sponsoredByNeynar AKTİF EDİLDİ)
     const registeredSigner = await neynarClient.registerSignedKey({
       signerUuid: signer.signer_uuid, 
       appFid: NEYNAR_APP_FID,
       deadline: deadline,
       signature: signature,
-      // Kendi FID'in uygulama olarak kayıtlı olmadığı için bu ayar ZORUNLUDUR
       sponsor: {
         sponsoredByNeynar: true
       }
@@ -71,9 +55,9 @@ export async function POST() {
     });
 
   } catch (error: any) {
-    console.error('[CREATE-SIGNER] HATA DETAYI:', error.response?.data || error);
+    console.error('HATA:', error.response?.data || error);
     return NextResponse.json(
-      { error: error.response?.data?.message || 'İmza doğrulanamadı' },
+      { error: error.response?.data?.message || 'Başarısız' },
       { status: 400 }
     );
   }
