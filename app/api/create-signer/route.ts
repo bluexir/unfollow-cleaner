@@ -5,7 +5,7 @@ import { neynarClient } from '@/lib/neynar';
 import { mnemonicToAccount } from 'viem/accounts';
 
 // Senin hem kişisel hem uygulama FID numaran
-const APP_FID = 429973; 
+const APP_FID = 24; 
 
 export async function POST() {
   try {
