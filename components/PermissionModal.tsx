@@ -10,7 +10,6 @@ interface PermissionModalProps {
 }
 
 export default function PermissionModal({ userFid, onPermissionGranted, onClose }: PermissionModalProps) {
-  // Değişken ismini backend ile uyumlu hale getirdik: signer_approval_url
   const [signerData, setSignerData] = useState<{ signer_uuid: string; signer_approval_url: string } | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
@@ -42,7 +41,6 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
         throw new Error(data?.error || 'Signer oluşturulamadı');
       }
 
-      // Backend'den gelen 'signer_approval_url' bilgisini kontrol ediyoruz
       if (!data?.signer_uuid || !data?.signer_approval_url) {
         throw new Error('Eksik signer verisi döndü');
       }
@@ -52,17 +50,19 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
         signer_approval_url: data.signer_approval_url 
       });
 
-      // Mini App içinde URL'yi açıyoruz
+      // Warpcast içinde aç
       try {
         await sdk.actions.openUrl(data.signer_approval_url);
       } catch (err) {
-        console.error('openUrl failed:', err);
+        console.error('[PERMISSION] openUrl başarısız:', err);
+        // Fallback: yeni sekme
         window.open(data.signer_approval_url, '_blank');
       }
 
       startPolling(data.signer_uuid);
+
     } catch (err: any) {
-      setError(err?.message || 'Signer oluşturulamadı. Tekrar dene.');
+      setError(err?.message || 'Signer oluşturulamadı. Tekrar deneyin.');
     } finally {
       setIsCreating(false);
     }
@@ -79,68 +79,72 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
         const response = await fetch(`/api/check-signer?signer_uuid=${encodeURIComponent(signerUuid)}`);
         const data = await response.json().catch(() => ({}));
 
-        // Durum 'approved' olduğunda ve FID eşleştiğinde işlemi tamamla
+        // Approved ve FID eşleşiyorsa tamamla
         if (response.ok && data?.status === 'approved' && Number(data?.fid) === userFid) {
           if (intervalRef.current) window.clearInterval(intervalRef.current);
+          if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
           setIsChecking(false);
           onPermissionGranted(signerUuid);
           return;
         }
 
         if (response.status === 404 || data?.status === 'not_found') {
-          throw new Error('İzin linki süresi dolmuş. Tekrar deneyin.');
+          throw new Error('Signer bulunamadı. Tekrar deneyin.');
         }
 
         if (response.ok && data?.status === 'revoked') {
-          throw new Error('İzin iptal edilmiş. Yeniden deneyin.');
+          throw new Error('İzin iptal edildi. Yeniden deneyin.');
         }
+
       } catch (err: any) {
-        setError(err?.message || 'İzin kontrolünde hata oluştu');
+        setError(err?.message || 'İzin kontrolünde hata');
         if (intervalRef.current) window.clearInterval(intervalRef.current);
+        if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
         setIsChecking(false);
       }
-    }, 3000); // 3 saniye (daha akıcı bir deneyim için)
+    }, 3000); // 3 saniye
 
+    // 3 dakika timeout
     timeoutRef.current = window.setTimeout(() => {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
       setIsChecking(false);
       setError('Onay çok uzun sürdü. Lütfen tekrar deneyin.');
-    }, 180000); // 3 dakika
+    }, 180000);
   };
 
   return (
     <div 
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
       <div 
-        className="bg-[#1c1f2e] border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl relative"
+        className="bg-gradient-to-b from-[#1c1f2e] to-[#151823] border border-purple-500/20 rounded-2xl p-8 max-w-md w-full shadow-2xl shadow-purple-900/20 relative"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl leading-none"
+          className="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl leading-none transition-colors"
         >
           ×
         </button>
 
-        <div className="w-16 h-16 bg-purple-500/15 border border-purple-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <span className="text-3xl">🛡️</span>
+        <div className="w-20 h-20 bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-purple-500/20">
+          <span className="text-4xl">🛡️</span>
         </div>
 
-        <h2 className="text-xl font-bold text-white text-center mb-2">
+        <h2 className="text-2xl font-bold text-white text-center mb-3">
           {isChecking ? 'Waiting for Approval...' : 'Permission Required'}
         </h2>
 
-        <p className="text-gray-400 text-sm text-center leading-relaxed mb-6">
+        <p className="text-gray-400 text-center leading-relaxed mb-6">
           {isChecking
-            ? 'Waiting for approval in Warpcast. Click "Approve" in the opened screen.'
-            : 'To unfollow users, you need to approve once in Warpcast. A small gas fee will be paid from your wallet.'}
+            ? 'Please approve in the opened Warpcast screen. This will allow the app to unfollow on your behalf.'
+            : 'To unfollow users, you need to grant permission once. This is secure and handled by Farcaster.'}
         </p>
 
         {error && (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-4">
-            <p className="text-red-300 text-sm">{error}</p>
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6 animate-shake">
+            <p className="text-red-300 text-sm text-center">{error}</p>
           </div>
         )}
 
@@ -148,13 +152,13 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold px-6 py-3 rounded-xl transition-colors"
+              className="flex-1 bg-gray-800 hover:bg-gray-700 text-white font-bold px-6 py-3 rounded-xl transition-all active:scale-95"
             >
               Cancel
             </button>
             <button
               onClick={createSigner}
-              className="flex-1 bg-[#7C65C1] hover:bg-[#6952a3] text-white font-bold px-6 py-3 rounded-xl transition-colors"
+              className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-purple-500/30 transition-all active:scale-95"
             >
               Authorize
             </button>
@@ -162,19 +166,23 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
         )}
 
         {isCreating && !signerData && (
-          <div className="flex items-center justify-center gap-2 py-3">
+          <div className="flex items-center justify-center gap-3 py-3">
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-400"></div>
-            <span className="text-gray-400 text-sm">Preparing authorization screen...</span>
+            <span className="text-gray-300 text-sm font-medium">Preparing authorization...</span>
           </div>
         )}
 
         {isChecking && signerData && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-center gap-2 py-3">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-400"></div>
-              <span className="text-gray-300 text-sm font-medium">Waiting for approval...</span>
+          <div className="space-y-4">
+            <div className="flex items-center justify-center gap-3 py-3">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-400"></div>
+              <span className="text-white text-sm font-semibold">Waiting for approval...</span>
             </div>
             
+            <p className="text-xs text-gray-500 text-center">
+              Approve in the opened Warpcast screen. If it didn't open, tap below.
+            </p>
+
             <button
               onClick={async () => {
                 if (!signerData?.signer_approval_url) return;
@@ -184,9 +192,9 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
                   window.open(signerData.signer_approval_url, '_blank');
                 }
               }}
-              className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold px-4 py-3 rounded-xl transition-colors"
+              className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold px-4 py-3 rounded-xl transition-all active:scale-95"
             >
-              Open in Warpcast Again
+              Open Approval Screen Again
             </button>
           </div>
         )}
@@ -194,4 +202,3 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
     </div>
   );
 }
-
