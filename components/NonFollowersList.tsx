@@ -42,6 +42,7 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
   const [pendingAction, setPendingAction] = useState<{ type: 'unfollow' | 'bulk', fids?: number[] } | null>(null);
   
   const [dismissedBanner, setDismissedBanner] = useState(false);
+
   const getScoreColor = (score: number | null) => {
     if (score === null) return "text-gray-500";
     if (score >= 0.8) return "text-green-400";
@@ -66,12 +67,16 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
     try {
       const response = await fetch(`/api/get-non-followers?fid=${userFid}`);
       const data = await response.json();
-      if (data.error) throw new Error(data.error);
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Liste yüklenemedi');
+      }
 
       setNonFollowers(data.nonFollowers || []);
       if (data.stats) setStats(data.stats);
+      
     } catch (error: any) {
-      setError(error.message || 'Liste yüklenirken hata oluştu.');
+      setError(error.message || 'Liste yüklenirken hata oluştu');
     } finally {
       setIsLoading(false);
     }
@@ -87,8 +92,11 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
 
   const toggleUser = (fid: number) => {
     const newSelected = new Set(selectedUsers);
-    if (newSelected.has(fid)) newSelected.delete(fid);
-    else newSelected.add(fid);
+    if (newSelected.has(fid)) {
+      newSelected.delete(fid);
+    } else {
+      newSelected.add(fid);
+    }
     setSelectedUsers(newSelected);
   };
 
@@ -129,13 +137,14 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
       if (stats) {
         setStats({
           ...stats,
-          following: stats.following - fids.length,
+          following: stats.following - data.unfollowed,
           nonFollowersCount: remaining.length
         });
       }
 
       setSelectedUsers(new Set());
-      setSessionCount(prev => prev + fids.length);
+      setSessionCount(prev => prev + data.unfollowed);
+      
     } catch (error: any) {
       setError(error.message || 'Unfollow işlemi başarısız');
     } finally {
@@ -174,158 +183,237 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
 
   if (isLoading) {
     return (
-      <div data-testid="nonfollowers-loading" className="flex flex-col items-center justify-center py-20 space-y-4">
-        <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-        <p className="text-sm font-mono text-gray-400 animate-pulse">VERİ ANALİZ EDİLİYOR...</p>
+      <div className="flex flex-col items-center justify-center py-24 space-y-4">
+        <div className="w-16 h-16 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin"></div>
+        <p className="text-sm font-mono text-gray-400 tracking-wider animate-pulse">ANALYZING DATA...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div data-testid="nonfollowers-error" className="bg-red-500/10 border border-red-500/50 p-6 rounded-lg text-center backdrop-blur-sm">
-        <p className="text-red-400 font-mono mb-2">SYSTEM ERROR</p>
-        <p className="text-white">{error}</p>
+      <div className="bg-gradient-to-br from-red-500/10 to-red-900/10 border border-red-500/30 p-8 rounded-2xl text-center backdrop-blur-sm shadow-xl">
+        <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-3xl">⚠️</span>
+        </div>
+        <p className="text-red-400 font-bold mb-2">ERROR</p>
+        <p className="text-white mb-4">{error}</p>
         <button 
-          data-testid="nonfollowers-retry-button"
           onClick={fetchNonFollowers} 
-          className="mt-4 px-4 py-2 bg-red-600/20 hover:bg-red-600/40 text-red-200 rounded border border-red-500/30 transition-all"
+          className="px-6 py-3 bg-red-600/30 hover:bg-red-600/50 text-red-200 rounded-xl border border-red-500/30 transition-all active:scale-95 font-semibold"
         >
-          Tekrar Dene
+          Retry
         </button>
       </div>
     );
   }
 
   return (
-    <div data-testid="nonfollowers-screen" className="space-y-8 relative min-h-screen pb-24 animate-fade-up">
+    <div className="space-y-8 relative min-h-screen pb-32">
       
       {!signerUuid && !dismissedBanner && nonFollowers.length > 0 && (
-        <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 flex items-center justify-between backdrop-blur-sm">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">⚡</span>
+        <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-2xl p-6 flex items-center justify-between backdrop-blur-sm shadow-lg shadow-purple-500/10">
+          <div className="flex items-center gap-4">
+            <span className="text-3xl">⚡</span>
             <div>
-              <p className="text-white font-semibold">Tek tuşla temizlemek için izin ver</p>
-              <p className="text-gray-400 text-sm">Veya her kişiye tıklayarak manuel unfollow yap</p>
+              <p className="text-white font-bold text-lg">Grant Permission for One-Tap Clean</p>
+              <p className="text-gray-400 text-sm">Or manually unfollow by clicking each person</p>
             </div>
           </div>
-          <button onClick={() => setDismissedBanner(true)} className="text-gray-400 hover:text-white text-2xl leading-none px-2">×</button>
+          <button 
+            onClick={() => setDismissedBanner(true)} 
+            className="text-gray-400 hover:text-white text-3xl leading-none px-3 transition-colors"
+          >
+            ×
+          </button>
         </div>
       )}
 
       {stats && (
-        <div className="grid grid-cols-3 gap-px bg-gray-800/50 border border-gray-800 rounded-xl overflow-hidden backdrop-blur-md">
-          <div className="bg-black/80 p-6 flex flex-col items-center justify-center hover:bg-white/5 transition-colors">
-            <span className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-1">FOLLOWING</span>
-            <span className="text-2xl font-bold text-white font-mono">{stats.following}</span>
+        <div className="grid grid-cols-3 gap-px bg-gradient-to-r from-purple-900/50 to-pink-900/50 border border-purple-500/20 rounded-2xl overflow-hidden backdrop-blur-md shadow-2xl shadow-purple-900/20">
+          <div className="bg-black/60 p-8 flex flex-col items-center justify-center hover:bg-black/80 transition-colors">
+            <span className="text-xs font-mono text-purple-400 uppercase tracking-widest mb-2">FOLLOWING</span>
+            <span className="text-3xl font-bold text-white font-mono">{stats.following}</span>
           </div>
-          <div className="bg-black/80 p-6 flex flex-col items-center justify-center hover:bg-white/5 transition-colors">
-            <span className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-1">FOLLOWERS</span>
-            <span className="text-2xl font-bold text-green-400 font-mono">{stats.followers}</span>
+          <div className="bg-black/60 p-8 flex flex-col items-center justify-center hover:bg-black/80 transition-colors">
+            <span className="text-xs font-mono text-green-400 uppercase tracking-widest mb-2">FOLLOWERS</span>
+            <span className="text-3xl font-bold text-green-400 font-mono">{stats.followers}</span>
           </div>
-          <div className="bg-black/80 p-6 flex flex-col items-center justify-center relative overflow-hidden group">
-            <div className="absolute inset-0 bg-red-900/20 group-hover:bg-red-900/30 transition-colors"></div>
-            <span className="text-xs font-mono text-red-400 uppercase tracking-widest mb-1 z-10">GHOSTS</span>
-            <span className="text-3xl font-bold text-red-500 font-mono z-10">{stats.nonFollowersCount}</span>
+          <div className="bg-black/60 p-8 flex flex-col items-center justify-center relative overflow-hidden group hover:bg-black/80 transition-colors">
+            <div className="absolute inset-0 bg-gradient-to-br from-red-900/30 to-pink-900/30 group-hover:from-red-900/40 group-hover:to-pink-900/40 transition-colors"></div>
+            <span className="text-xs font-mono text-red-400 uppercase tracking-widest mb-2 z-10">NON-FOLLOWERS</span>
+            <span className="text-4xl font-bold text-red-500 font-mono z-10">{stats.nonFollowersCount}</span>
           </div>
         </div>
       )}
 
       {nonFollowers.length > 0 ? (
-        <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4 border-b border-gray-800 pb-4">
-          <div>
-            <h2 className="text-xl font-bold text-white">Tespit Edilen Hesaplar</h2>
-            <p className="text-sm text-gray-500 mt-1">Bu kişiler seni takip etmiyor.</p>
+        <>
+          <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4 border-b border-purple-500/20 pb-4">
+            <div>
+              <h2 className="text-2xl font-bold text-white">Detected Accounts</h2>
+              <p className="text-sm text-gray-500 mt-1">These people don't follow you back.</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <div className={`w-6 h-6 border-2 rounded-md flex items-center justify-center transition-all ${selectedUsers.size === nonFollowers.length ? 'bg-purple-500 border-purple-500' : 'border-gray-600 group-hover:border-purple-400'}`}>
+                  {selectedUsers.size === nonFollowers.length && (
+                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                    </svg>
+                  )}
+                </div>
+                <input 
+                  type="checkbox" 
+                  className="hidden" 
+                  onChange={toggleSelectAll} 
+                  checked={selectedUsers.size === nonFollowers.length} 
+                />
+                <span className="text-sm font-semibold text-gray-400 group-hover:text-white transition-colors">Select All</span>
+              </label>
+              {selectedUsers.size > 0 && (
+                <button 
+                  onClick={handleBulkUnfollowClick} 
+                  disabled={isUnfollowing} 
+                  className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500 disabled:from-gray-800 disabled:to-gray-800 disabled:text-gray-500 text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-red-500/30 transition-all active:scale-95 flex items-center gap-3"
+                >
+                  {isUnfollowing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span className="animate-pulse">CLEANING...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-mono text-lg">CLEAN</span>
+                      <span className="bg-black/30 px-2 py-1 rounded-lg text-sm font-bold">{selectedUsers.size}</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 cursor-pointer group">
-              <div className={`w-5 h-5 border rounded flex items-center justify-center transition-colors ${selectedUsers.size === nonFollowers.length ? 'bg-white border-white' : 'border-gray-600 group-hover:border-gray-400'}`}>
-                {selectedUsers.size === nonFollowers.length && <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>}
-              </div>
-              <input 
-                data-testid="nonfollowers-select-all-checkbox"
-                type="checkbox" className="hidden" onChange={toggleSelectAll} checked={selectedUsers.size === nonFollowers.length} 
-              />
-              <span className="text-sm font-medium text-gray-400 group-hover:text-white transition-colors">Tümünü Seç</span>
-            </label>
-            {selectedUsers.size > 0 && (
-              <button 
-                data-testid="nonfollowers-unfollow-button"
-                onClick={handleBulkUnfollowClick} disabled={isUnfollowing} className="bg-red-600 hover:bg-red-500 disabled:bg-gray-800 disabled:text-gray-500 text-white font-bold py-2 px-6 rounded-lg shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all flex items-center gap-2"
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {nonFollowers.map((user) => (
+              <div 
+                key={user.fid} 
+                className={`group relative p-5 rounded-2xl border transition-all duration-200 flex items-center gap-4 ${
+                  selectedUsers.has(user.fid) 
+                    ? 'bg-gradient-to-br from-red-900/20 to-pink-900/20 border-red-500/50 shadow-lg shadow-red-500/10' 
+                    : 'bg-black/40 border-purple-500/10 hover:border-purple-500/30 hover:shadow-lg hover:shadow-purple-500/10'
+                }`}
               >
-                {isUnfollowing ? <span className="animate-pulse">TEMİZLENİYOR...</span> : <><span className="font-mono">TEMİZLE</span><span className="bg-black/20 px-2 py-0.5 rounded text-sm">{selectedUsers.size}</span></>}
-              </button>
-            )}
+                <div 
+                  onClick={() => toggleUser(user.fid)} 
+                  className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center flex-shrink-0 cursor-pointer transition-all ${
+                    selectedUsers.has(user.fid) 
+                      ? 'bg-red-500 border-red-500' 
+                      : 'border-gray-600 hover:border-purple-400'
+                  }`}
+                >
+                  {selectedUsers.has(user.fid) && (
+                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                    </svg>
+                  )}
+                </div>
+                
+                <img 
+                  src={user.pfp_url || 'https://warpcast.com/avatar.png'} 
+                  alt={user.username} 
+                  className="w-14 h-14 rounded-xl object-cover bg-gray-800 border border-purple-500/20" 
+                />
+                
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-bold text-white truncate text-lg">{user.display_name}</span>
+                    {user.power_badge && (
+                      <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-1 rounded-lg border border-purple-500/30 font-bold">⚡️</span>
+                    )}
+                  </div>
+                  <div className="text-sm text-gray-500 truncate font-mono mb-3">@{user.username}</div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleViewProfile(user.username, user.fid)} 
+                      className="text-xs bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 px-3 py-1.5 rounded-lg border border-purple-500/30 transition-all active:scale-95 font-semibold"
+                    >
+                      👁️ View
+                    </button>
+                    <button 
+                      onClick={() => handleUnfollowClick(user.fid)} 
+                      disabled={isUnfollowing} 
+                      className="text-xs bg-red-600/20 hover:bg-red-600/30 disabled:bg-gray-800 text-red-400 disabled:text-gray-500 px-3 py-1.5 rounded-lg border border-red-500/30 disabled:border-gray-700 transition-all active:scale-95 font-semibold"
+                    >
+                      🗑️ Unfollow
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="text-right space-y-2">
+                  {user.neynar_score !== null && (
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <span className="text-sm">{getScoreBadge(user.neynar_score)}</span>
+                      <span className={`text-sm font-bold ${getScoreColor(user.neynar_score)}`}>
+                        {user.neynar_score.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-xs text-gray-500 uppercase tracking-wide">Followers</div>
+                    <div className="text-base font-mono text-gray-300 font-bold">{user.follower_count.toLocaleString()}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
+        </>
       ) : (
-        <div className="text-center py-24 bg-gray-900/30 rounded-2xl border border-gray-800 border-dashed">
-          <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <div className="text-center py-32 bg-gradient-to-br from-green-900/10 to-green-500/10 rounded-3xl border-2 border-green-500/20 border-dashed">
+          <div className="w-24 h-24 bg-gradient-to-br from-green-500/20 to-green-400/20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/20">
+            <svg className="w-12 h-12 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </div>
-          <h3 className="text-2xl font-bold text-white mb-2">Her Şey Tertemiz!</h3>
+          <h3 className="text-3xl font-bold text-white mb-3">All Clean!</h3>
+          <p className="text-gray-400 text-lg">Everyone you follow follows you back.</p>
         </div>
       )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {nonFollowers.map((user) => (
-          <div 
-            data-testid={`nonfollowers-user-row-${user.fid}`}
-            key={user.fid} className={`group relative p-4 rounded-xl border transition-all duration-200 flex items-center gap-4 ${selectedUsers.has(user.fid) ? 'bg-red-900/10 border-red-500/50' : 'bg-black/40 border-gray-800 hover:border-gray-600'}`}
-          >
-            <div onClick={() => toggleUser(user.fid)} className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 cursor-pointer ${selectedUsers.has(user.fid) ? 'bg-red-500 border-red-500' : 'border-gray-600 bg-transparent'}`}>
-              {selectedUsers.has(user.fid) && <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>}
-            </div>
-            <img src={user.pfp_url || 'https://warpcast.com/avatar.png'} alt={user.username} className="w-12 h-12 rounded-lg object-cover bg-gray-800" />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-white truncate">{user.display_name}</span>
-                {user.power_badge && <span className="text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded border border-purple-500/30">⚡️</span>}
-              </div>
-              <div className="text-sm text-gray-500 truncate font-mono">@{user.username}</div>
-              <div className="flex gap-2 mt-2">
-                <button onClick={() => handleViewProfile(user.username, user.fid)} className="text-xs bg-gray-700/50 hover:bg-gray-700 text-gray-300 px-3 py-1 rounded">👁️ Profil</button>
-                <button onClick={() => handleUnfollowClick(user.fid)} disabled={isUnfollowing} className="text-xs bg-red-600/50 hover:bg-red-600 disabled:bg-gray-800 text-white px-3 py-1 rounded">🗑️ Unfollow</button>
-              </div>
-            </div>
-            <div className="text-right space-y-1">
-              {user.neynar_score !== null && (
-                <div className="flex items-center gap-1 justify-end">
-                  <span className="text-xs">{getScoreBadge(user.neynar_score)}</span>
-                  <span className={`text-xs font-bold ${getScoreColor(user.neynar_score)}`}>{user.neynar_score.toFixed(2)}</span>
-                </div>
-              )}
-              <div>
-                <div className="text-xs text-gray-500 uppercase">Takipçi</div>
-                <div className="text-sm font-mono text-gray-300">{user.follower_count.toLocaleString()}</div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
 
       <TipSection />
 
       {sessionCount > 0 && (
-        <div className="fixed bottom-6 right-6 z-50 animate-bounce-in">
-          <div className="bg-black border border-gray-700 shadow-2xl rounded-full pl-6 pr-2 py-2 flex items-center gap-6">
+        <div className="fixed bottom-8 right-8 z-50 animate-bounce-in">
+          <div className="bg-gradient-to-r from-black to-gray-900 border-2 border-purple-500/50 shadow-2xl rounded-2xl pl-8 pr-3 py-3 flex items-center gap-6">
             <div className="flex flex-col">
-              <span className="text-[10px] uppercase text-gray-500 font-bold tracking-widest">Bu Oturumda</span>
-              <span className="text-sm text-white font-mono"><span className="text-red-500 font-bold text-lg">{sessionCount}</span> KİŞİ SİLİNDİ</span>
+              <span className="text-[10px] uppercase text-purple-400 font-bold tracking-widest">This Session</span>
+              <span className="text-base text-white font-mono">
+                <span className="text-red-500 font-bold text-2xl">{sessionCount}</span> CLEANED
+              </span>
             </div>
             <button 
-              data-testid="session-share-button"
-              onClick={() => setShowSharePopup(true)} className="bg-white text-black hover:bg-gray-200 font-bold py-2 px-6 rounded-full text-sm flex items-center gap-2"
+              onClick={() => setShowSharePopup(true)} 
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold py-3 px-8 rounded-xl text-base flex items-center gap-2 shadow-lg shadow-purple-500/30 transition-all active:scale-95"
             >
-              <span>PAYLAŞ</span>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+              <span>SHARE</span>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+              </svg>
             </button>
           </div>
         </div>
       )}
 
       {showSharePopup && <ShareCastPopup unfollowCount={sessionCount} onClose={() => setShowSharePopup(false)} />}
-      {showPermissionModal && <PermissionModal userFid={userFid} onPermissionGranted={handlePermissionGranted} onClose={() => { setShowPermissionModal(false); setPendingAction(null); }} />}
+      {showPermissionModal && (
+        <PermissionModal 
+          userFid={userFid} 
+          onPermissionGranted={handlePermissionGranted} 
+          onClose={() => { 
+            setShowPermissionModal(false); 
+            setPendingAction(null); 
+          }} 
+        />
+      )}
     </div>
   );
 }
