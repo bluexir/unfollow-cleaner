@@ -20,21 +20,23 @@ export default function AppShell({ user }: { user: { fid: number } }) {
   const [storedSigner, setStoredSigner] = useState<string | null>(null);
   const [signerRestoreAttempted, setSignerRestoreAttempted] = useState(false);
 
-  // 0) LocalStorage'dan güvenli okuma
+  // 1. LocalStorage'dan signer oku
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    setStoredSigner(window.localStorage.getItem(SIGNER_STORAGE_KEY));
+    const stored = window.localStorage.getItem(SIGNER_STORAGE_KEY);
+    setStoredSigner(stored);
     setSignerRestoreAttempted(true);
   }, []);
 
-  // 1) Follow gate
+  // 2. Follow gate kontrolü
   useEffect(() => {
     let cancelled = false;
 
-    const run = async () => {
+    const checkFollow = async () => {
       setIsCheckingFollow(true);
       setFollowError(null);
 
+      // Developer kendisini kontrol etmez
       if (userFid === DEV_FID) {
         if (!cancelled) {
           setIsFollowingDev(true);
@@ -64,13 +66,13 @@ export default function AppShell({ user }: { user: { fid: number } }) {
       }
     };
 
-    run();
+    checkFollow();
     return () => {
       cancelled = true;
     };
   }, [userFid]);
 
-  // 2) Signer restore + verify
+  // 3. Stored signer'ı doğrula
   useEffect(() => {
     let cancelled = false;
 
@@ -95,7 +97,7 @@ export default function AppShell({ user }: { user: { fid: number } }) {
       }
     };
 
-    const run = async () => {
+    const checkStoredSigner = async () => {
       setIsCheckingSigner(true);
 
       if (!storedSigner) {
@@ -111,6 +113,7 @@ export default function AppShell({ user }: { user: { fid: number } }) {
         if (result.ok) {
           setSignerUuid(storedSigner);
         } else {
+          // Geçersiz signer, temizle
           if (typeof window !== 'undefined') {
             window.localStorage.removeItem(SIGNER_STORAGE_KEY);
           }
@@ -121,7 +124,7 @@ export default function AppShell({ user }: { user: { fid: number } }) {
       }
     };
 
-    run();
+    checkStoredSigner();
     return () => {
       cancelled = true;
     };
@@ -143,45 +146,46 @@ export default function AppShell({ user }: { user: { fid: number } }) {
     }
   };
 
+  // Loading state
   if (isCheckingFollow || isCheckingSigner) {
     return (
-      <div data-testid="app-shell-loading" className="flex flex-col items-center justify-center min-h-[70vh] px-6">
-        <div className="loader mb-4" />
-        <p className="text-gray-500 text-xs tracking-[0.25em] animate-pulse">SECURITY CHECK...</p>
+      <div className="flex flex-col items-center justify-center min-h-[70vh] px-6">
+        <div className="w-12 h-12 border-3 border-purple-500/20 border-t-purple-500 rounded-full animate-spin mb-4" />
+        <p className="text-gray-400 text-sm font-mono tracking-wider animate-pulse">LOADING...</p>
       </div>
     );
   }
 
+  // Follow gate
   if (!isFollowingDev) {
     return (
-      <div data-testid="follow-gate-screen" className="px-4 pt-6 pb-12 max-w-md mx-auto animate-fade-up">
-        <div className="bg-[#1c1f2e]/80 backdrop-blur-md rounded-2xl p-6 border border-white/5 shadow-2xl">
+      <div className="px-4 pt-8 pb-12 max-w-md mx-auto">
+        <div className="bg-gradient-to-b from-[#1c1f2e] to-[#151823] border border-purple-500/20 rounded-2xl p-8 shadow-2xl shadow-purple-900/20">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center flex-shrink-0">
-              <span className="text-purple-300 text-xl">🔒</span>
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 flex items-center justify-center flex-shrink-0 shadow-lg shadow-purple-500/20">
+              <span className="text-purple-300 text-2xl">🔒</span>
             </div>
             <div className="flex-1">
-              <h1 className="text-xl font-bold text-white">Follow Required</h1>
-              <p className="text-gray-400 text-sm mt-1 leading-relaxed">
-                To use this tool, follow <span className="text-purple-300 font-semibold">@bluexir</span>.
+              <h1 className="text-2xl font-bold text-white mb-2">Follow Required</h1>
+              <p className="text-gray-400 text-sm leading-relaxed mb-1">
+                To use this tool, please follow{' '}
+                <span className="text-purple-400 font-semibold">@bluexir</span>.
               </p>
               {followError && (
                 <p className="text-red-400 text-xs mt-3 font-mono bg-red-500/10 border border-red-500/20 p-3 rounded-lg">
                   {followError}
                 </p>
               )}
-              <div className="mt-4 flex flex-col gap-3">
+              <div className="mt-6 flex flex-col gap-3">
                 <button
-                  data-testid="follow-gate-follow-button"
                   onClick={openDevProfile}
-                  className="bg-[#7C65C1] hover:bg-[#6952a3] text-white py-3 px-6 rounded-xl font-bold shadow-lg shadow-purple-900/20 transition-colors active:scale-[0.99]"
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white py-3 px-6 rounded-xl font-bold shadow-lg shadow-purple-500/30 transition-all active:scale-95"
                 >
                   Follow @bluexir
                 </button>
                 <button
-                  data-testid="follow-gate-refresh-button"
                   onClick={() => window.location.reload()}
-                  className="text-xs text-gray-500 hover:text-white underline decoration-dashed"
+                  className="text-sm text-gray-500 hover:text-white underline decoration-dashed transition-colors"
                 >
                   I followed, refresh
                 </button>
@@ -193,14 +197,21 @@ export default function AppShell({ user }: { user: { fid: number } }) {
     );
   }
 
+  // Main app
   return (
-    <div data-testid="app-shell-main" className="px-4 pt-6 max-w-3xl mx-auto animate-fade-up">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Unfollow Cleaner</h1>
-        <p className="text-gray-500 text-sm mt-1">Find non-followers and clean up with one tap.</p>
+    <div className="px-4 pt-8 pb-24 max-w-4xl mx-auto">
+      <div className="mb-8 text-center">
+        <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 mb-2">
+          Unfollow Cleaner
+        </h1>
+        <p className="text-gray-500 text-sm">Find non-followers and clean up with one tap.</p>
       </div>
 
-      <NonFollowersList userFid={userFid} signerUuid={signerUuid} onSignerGranted={handleSignerGranted} />
+      <NonFollowersList 
+        userFid={userFid} 
+        signerUuid={signerUuid} 
+        onSignerGranted={handleSignerGranted} 
+      />
     </div>
   );
 }
