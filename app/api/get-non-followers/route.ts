@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     const userFid = parseInt(fid);
     console.log('[GET-NON-FOLLOWERS] Başlatılıyor, FID:', userFid);
 
-    // 1. Following listesini al (pagination ile - viewerFid YOK)
+    // 1. Following listesini al (pagination ile)
     let followingList: any[] = [];
     let followingCursor: string | null = null;
 
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 
     console.log('[GET-NON-FOLLOWERS] Toplam following:', followingList.length);
 
-    // 2. Followers listesini al (pagination ile - viewerFid YOK)
+    // 2. Followers listesini al (pagination ile)
     let followersList: any[] = [];
     let followersCursor: string | null = null;
 
@@ -60,6 +60,12 @@ export async function GET(req: NextRequest) {
 
     // 3. Followers FID set'i oluştur (TYPE CASTING ile!)
     const followerFids = new Set(followersList.map((u: any) => Number(u.fid)));
+
+    // TEST LOGLARI - FID'leri kontrol et
+    console.log('[TEST] İlk 10 Following FID:', followingList.slice(0, 10).map(u => u.fid));
+    console.log('[TEST] İlk 10 Followers FID:', followersList.slice(0, 10).map(u => u.fid));
+    console.log('[TEST] Following[0] in Followers Set?', followerFids.has(Number(followingList[0]?.fid)));
+    console.log('[TEST] Follower FIDs size:', followerFids.size);
 
     // 4. Non-followers'ı filtrele (TYPE CASTING ile!)
     const nonFollowers = followingList.filter((user: any) => !followerFids.has(Number(user.fid)));
