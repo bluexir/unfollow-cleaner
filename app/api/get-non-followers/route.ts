@@ -18,13 +18,14 @@ export async function GET(req: NextRequest) {
     const userFid = parseInt(fid);
     console.log('[GET-NON-FOLLOWERS] Başlatılıyor, FID:', userFid);
 
-    // 1. Following listesini al (pagination ile)
+    // 1. Following listesini al (pagination + viewer_fid ile)
     let followingList: any[] = [];
     let followingCursor: string | null = null;
 
     do {
       const followingResponse = await neynarClient.fetchUserFollowing({
         fid: userFid,
+        viewerFid: userFid, // Filtrelenmiş sonuçlar için
         limit: 100,
         ...(followingCursor && { cursor: followingCursor })
       });
@@ -38,13 +39,14 @@ export async function GET(req: NextRequest) {
 
     console.log('[GET-NON-FOLLOWERS] Toplam following:', followingList.length);
 
-    // 2. Followers listesini al (pagination ile)
+    // 2. Followers listesini al (pagination + viewer_fid ile)
     let followersList: any[] = [];
     let followersCursor: string | null = null;
 
     do {
       const followersResponse = await neynarClient.fetchUserFollowers({
         fid: userFid,
+        viewerFid: userFid, // Filtrelenmiş sonuçlar için
         limit: 100,
         ...(followersCursor && { cursor: followersCursor })
       });
