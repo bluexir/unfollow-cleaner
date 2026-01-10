@@ -1,30 +1,65 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { neynarClient } from '@/lib/neynar';
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const { targetFid } = await req.json();
-    
-    // Vercel üzerindeki UUID
-    const signerUuid = process.env.FARCASTER_SIGNER_UUID;
+    const { signer_uuid, target_fids } = await req.json();
 
-    if (!signerUuid) {
-      console.error("[UNFOLLOW] HATA: Signer UUID bulunamadı.");
-      return NextResponse.json({ error: 'Signer UUID eksik.' }, { status: 500 });
+    if (!signer_uuid) {
+      return NextResponse.json(
+        { error: 'signer_uuid gerekli' },
+        { status: 400 }
+      );
     }
 
-    console.log(`[UNFOLLOW] İşlem deneniyor. Target FID: ${targetFid}, Signer: ${signerUuid}`);
+    if (!target_fids || !Array.isArray(target_fids) || target_fids.length === 0) {
+      return NextResponse.json(
+        { error: 'target_fids gerekli (array)' },
+        { status: 400 }
+      );
+    }
 
-    // Hata aldığımız o satır
-    const response = await neynarClient.deleteFollow(signerUuid, [targetFid]);
+    console.log('[UNFOLLOW] Başlatılıyor, Signer:', signer_uuid);
+    console.log('[UNFOLLOW] Hedef sayısı:', target_fids.length);
 
-    return NextResponse.json({ success: true, response });
+    const results = [];
+    const errors = [];
+
+    // Her bir FID için unfollow işlemi
+    for (const targetFid of target_fids) {
+      try {
+        await neynarClient.deleteFollow({
+          signerUuid: signer_uuid,
+          targetFid: targetFid
+        });
+
+        console.log('[UNFOLLOW] Başarılı:', targetFid);
+        results.push({ fid: targetFid, success: true });
+
+        // Rate limit için 100ms bekle
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+      } catch (err: any) {
+        console.error('[UNFOLLOW] Hata:', targetFid, err.message);
+        errors.push({ fid: targetFid, error: err.message });
+      }
+    }
+
+    console.log('[UNFOLLOW] Tamamlandı. Başarılı:', results.length, 'Hatalı:', errors.length);
+
+    return NextResponse.json({
+      success: true,
+      unfollowed: results.length,
+      failed: errors.length,
+      results: results,
+      errors: errors
+    });
+
   } catch (error: any) {
-    // Aldığımız o meşhur hata detayları
-    console.error('[UNFOLLOW] HATA DETAYI:', error.response?.data || error.message);
+    console.error('[UNFOLLOW] Genel hata:', error);
     return NextResponse.json(
-      { error: error.response?.data?.message || 'İşlem başarısız oldu' },
-      { status: 400 }
+      { error: error.message || 'Unfollow işlemi başarısız' },
+      { status: 500 }
     );
   }
 }
