@@ -29,11 +29,6 @@ export async function GET(req: NextRequest) {
         ...(followingCursor && { cursor: followingCursor })
       });
 
-      // FULL RESPONSE LOG (ilk batch)
-      if (followingList.length === 0) {
-        console.log('[FULL RESPONSE] Following ilk user:', JSON.stringify(followingResponse.users?.[0], null, 2));
-      }
-
       followingList = followingList.concat(followingResponse.users || []);
       followingCursor = followingResponse.next?.cursor || null;
 
@@ -54,11 +49,6 @@ export async function GET(req: NextRequest) {
         ...(followersCursor && { cursor: followersCursor })
       });
 
-      // FULL RESPONSE LOG (ilk batch)
-      if (followersList.length === 0) {
-        console.log('[FULL RESPONSE] Followers ilk user:', JSON.stringify(followersResponse.users?.[0], null, 2));
-      }
-
       followersList = followersList.concat(followersResponse.users || []);
       followersCursor = followersResponse.next?.cursor || null;
 
@@ -68,26 +58,29 @@ export async function GET(req: NextRequest) {
 
     console.log('[GET-NON-FOLLOWERS] Toplam followers:', followersList.length);
 
-    // 3. Followers FID set'i oluştur (TYPE CASTING ile!)
-    const followerFids = new Set(followersList.map((u: any) => Number(u.fid)));
+    // 3. Followers FID set'i oluştur (u.user.fid ile!)
+    const followerFids = new Set(followersList.map((u: any) => Number(u.user?.fid)));
 
-    console.log('[TEST] Follower FIDs size:', followerFids.size);
+    console.log('[GET-NON-FOLLOWERS] Follower FIDs set size:', followerFids.size);
 
-    // 4. Non-followers'ı filtrele (TYPE CASTING ile!)
-    const nonFollowers = followingList.filter((user: any) => !followerFids.has(Number(user.fid)));
+    // 4. Non-followers'ı filtrele (u.user.fid ile!)
+    const nonFollowers = followingList.filter((follow: any) => !followerFids.has(Number(follow.user?.fid)));
 
     console.log('[GET-NON-FOLLOWERS] Non-followers sayısı:', nonFollowers.length);
 
-    // 5. Formatlı veri döndür
-    const formattedNonFollowers = nonFollowers.map((user: any) => ({
-      fid: user.fid,
-      username: user.username,
-      display_name: user.display_name || user.username,
-      pfp_url: user.pfp_url,
-      follower_count: user.follower_count || 0,
-      power_badge: user.power_badge || false,
-      neynar_score: user.experimental?.neynar_user_score || null
-    }));
+    // 5. Formatlı veri döndür (u.user.* ile!)
+    const formattedNonFollowers = nonFollowers.map((follow: any) => {
+      const user = follow.user;
+      return {
+        fid: user.fid,
+        username: user.username,
+        display_name: user.display_name || user.username,
+        pfp_url: user.pfp_url,
+        follower_count: user.follower_count || 0,
+        power_badge: user.power_badge || false,
+        neynar_score: user.score || user.experimental?.neynar_user_score || null
+      };
+    });
 
     return NextResponse.json({
       nonFollowers: formattedNonFollowers,
