@@ -1,104 +1,95 @@
-import { NextRequest, NextResponse } from "next/server";
-import { neynarClient } from "@/lib/neynar";
-
 export const dynamic = 'force-dynamic';
-export const fetchCache = 'force-no-store';
+
+import { NextRequest, NextResponse } from 'next/server';
+import { neynarClient } from '@/lib/neynar';
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const fid = searchParams.get("fid");
-  
-  if (!fid) {
-    return NextResponse.json({ error: "FID parametresi gerekli" }, { status: 400 });
-  }
-
-  const fidNumber = parseInt(fid);
-
   try {
-    console.log(`🚀 [ANALİZ] Başlıyor - FID: ${fidNumber}`);
+    const searchParams = req.nextUrl.searchParams;
+    const fid = searchParams.get('fid');
 
-    const followingMap = new Map();
-    let followingCursor: string | undefined = undefined;
-    let followingCount = 0;
-
-    while (followingCursor !== null) {
-      const response = await neynarClient.fetchUserFollowing({
-        fid: fidNumber,
-        limit: 100,
-        cursor: followingCursor,
-      });
-
-      response.users.forEach((item: any) => {
-        const user = item.user || item;
-        if (user && user.fid) {
-          followingMap.set(user.fid, {
-            fid: user.fid,
-            username: user.username,
-            display_name: user.display_name || user.username,
-            pfp_url: user.pfp_url,
-            follower_count: user.follower_count,
-            power_badge: user.power_badge,
-            neynar_score: user.score ?? null,
-          });
-        }
-      });
-
-      followingCursor = response.next?.cursor;
-      followingCount += response.users.length;
-      
-      if (followingCount >= 3000) break;
+    if (!fid) {
+      return NextResponse.json(
+        { error: 'FID gerekli' },
+        { status: 400 }
+      );
     }
 
-    console.log(`✅ [FOLLOWING] ${followingMap.size} kişi alındı.`);
+    const userFid = parseInt(fid);
+    console.log('[GET-NON-FOLLOWERS] Başlatılıyor, FID:', userFid);
 
-    const followersSet = new Set<number>();
-    let followersCursor: string | undefined = undefined;
-    let followersCount = 0;
+    // 1. Following listesini al (pagination ile)
+    let followingList: any[] = [];
+    let followingCursor: string | null = null;
 
-    while (followersCursor !== null) {
-      const response = await neynarClient.fetchUserFollowers({
-        fid: fidNumber,
+    do {
+      const followingResponse = await neynarClient.fetchUserFollowing({
+        fid: userFid,
         limit: 100,
-        cursor: followersCursor,
+        ...(followingCursor && { cursor: followingCursor })
       });
 
-      response.users.forEach((item: any) => {
-        const user = item.user || item;
-        if (user && user.fid) {
-          followersSet.add(user.fid);
-        }
+      followingList = followingList.concat(followingResponse.users || []);
+      followingCursor = followingResponse.next?.cursor || null;
+
+      console.log('[GET-NON-FOLLOWERS] Following batch:', followingResponse.users?.length, 'Total:', followingList.length);
+
+    } while (followingCursor);
+
+    console.log('[GET-NON-FOLLOWERS] Toplam following:', followingList.length);
+
+    // 2. Followers listesini al (pagination ile)
+    let followersList: any[] = [];
+    let followersCursor: string | null = null;
+
+    do {
+      const followersResponse = await neynarClient.fetchUserFollowers({
+        fid: userFid,
+        limit: 100,
+        ...(followersCursor && { cursor: followersCursor })
       });
 
-      followersCursor = response.next?.cursor;
-      followersCount += response.users.length;
+      followersList = followersList.concat(followersResponse.users || []);
+      followersCursor = followersResponse.next?.cursor || null;
 
-      if (followersCount >= 3000) break;
-    }
+      console.log('[GET-NON-FOLLOWERS] Followers batch:', followersResponse.users?.length, 'Total:', followersList.length);
 
-    console.log(`✅ [FOLLOWERS] ${followersSet.size} kişi alındı.`);
+    } while (followersCursor);
 
-    const followingList = Array.from(followingMap.values());
-    const nonFollowers = followingList.filter(
-      (user) => !followersSet.has(user.fid)
-    );
+    console.log('[GET-NON-FOLLOWERS] Toplam followers:', followersList.length);
 
-    const sortedNonFollowers = nonFollowers.sort((a, b) => a.follower_count - b.follower_count);
+    // 3. Followers FID set'i oluştur
+    const followerFids = new Set(followersList.map((u: any) => u.fid));
 
-    console.log(`🎯 [SONUÇ] ${sortedNonFollowers.length} kişi seni takip etmiyor.`);
+    // 4. Non-followers'ı filtrele
+    const nonFollowers = followingList.filter((user: any) => !followerFids.has(user.fid));
+
+    console.log('[GET-NON-FOLLOWERS] Non-followers sayısı:', nonFollowers.length);
+
+    // 5. Formatlı veri döndür
+    const formattedNonFollowers = nonFollowers.map((user: any) => ({
+      fid: user.fid,
+      username: user.username,
+      display_name: user.display_name || user.username,
+      pfp_url: user.pfp_url,
+      follower_count: user.follower_count || 0,
+      power_badge: user.power_badge || false,
+      neynar_score: user.experimental?.neynar_user_score || null
+    }));
 
     return NextResponse.json({
-      nonFollowers: sortedNonFollowers,
+      nonFollowers: formattedNonFollowers,
       stats: {
-        following: followingMap.size,
-        followers: followersSet.size,
-        nonFollowersCount: sortedNonFollowers.length,
-      },
+        following: followingList.length,
+        followers: followersList.length,
+        nonFollowersCount: nonFollowers.length
+      }
     });
 
   } catch (error: any) {
-    console.error("🔥 [API HATASI]:", error.message);
+    console.error('[GET-NON-FOLLOWERS] Hata:', error);
     return NextResponse.json(
-      { error: "Kullanıcı verileri analiz edilemedi. Neynar bağlantısını kontrol edin." },
+      { error: error.message || 'Liste alınamadı' },
       { status: 500 }
     );
   }
