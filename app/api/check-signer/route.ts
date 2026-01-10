@@ -17,12 +17,13 @@ export async function GET(req: NextRequest) {
 
     console.log('[CHECK-SIGNER] Kontrol ediliyor:', signer_uuid);
 
-    // SDK v3: camelCase!
+    // Neynar SDK v3: camelCase kullanır
     const signer = await neynarClient.lookupSigner({
       signerUuid: signer_uuid
     });
 
     console.log('[CHECK-SIGNER] Status:', signer.status);
+    console.log('[CHECK-SIGNER] FID:', signer.fid);
 
     return NextResponse.json({
       status: signer.status,
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: error.message || 'Check signer failed' },
+      { error: error.message || 'Signer kontrolü başarısız' },
       { status: 500 }
     );
   }
