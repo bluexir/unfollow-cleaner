@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     do {
       const followingResponse = await neynarClient.fetchUserFollowing({
         fid: userFid,
-        viewerFid: userFid, // Filtrelenmiş sonuçlar için
+        viewerFid: userFid,
         limit: 100,
         ...(followingCursor && { cursor: followingCursor })
       });
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
     do {
       const followersResponse = await neynarClient.fetchUserFollowers({
         fid: userFid,
-        viewerFid: userFid, // Filtrelenmiş sonuçlar için
+        viewerFid: userFid,
         limit: 100,
         ...(followersCursor && { cursor: followersCursor })
       });
@@ -60,11 +60,11 @@ export async function GET(req: NextRequest) {
 
     console.log('[GET-NON-FOLLOWERS] Toplam followers:', followersList.length);
 
-    // 3. Followers FID set'i oluştur
-    const followerFids = new Set(followersList.map((u: any) => u.fid));
+    // 3. Followers FID set'i oluştur (TYPE CASTING ile!)
+    const followerFids = new Set(followersList.map((u: any) => Number(u.fid)));
 
-    // 4. Non-followers'ı filtrele
-    const nonFollowers = followingList.filter((user: any) => !followerFids.has(user.fid));
+    // 4. Non-followers'ı filtrele (TYPE CASTING ile!)
+    const nonFollowers = followingList.filter((user: any) => !followerFids.has(Number(user.fid)));
 
     console.log('[GET-NON-FOLLOWERS] Non-followers sayısı:', nonFollowers.length);
 
