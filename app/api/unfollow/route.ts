@@ -28,17 +28,20 @@ export async function POST(req: NextRequest) {
     // Her bir FID için unfollow işlemi
     for (const targetFid of target_fids) {
       try {
-        // SDK v3 metodu: unfollowUser(signer_uuid, [fid_array])
-        const response = await neynarClient.unfollowUser(signer_uuid, [targetFid]);
+        // SDK v3 OBJECT FORMAT
+        const response = await neynarClient.unfollowUser({
+          signerUuid: signer_uuid,
+          targetFids: [targetFid]
+        });
 
-        console.log('[UNFOLLOW] Başarılı:', targetFid, 'Response:', response);
+        console.log('[UNFOLLOW] Başarılı:', targetFid);
         results.push({ fid: targetFid, success: true });
 
-        // Rate limit için 200ms bekle
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Rate limit için 150ms bekle
+        await new Promise(resolve => setTimeout(resolve, 150));
 
       } catch (err: any) {
-        console.error('[UNFOLLOW] Hata:', targetFid, 'Error:', err.message, 'Full:', err);
+        console.error('[UNFOLLOW] Hata:', targetFid, err.message);
         errors.push({ fid: targetFid, error: err.message });
       }
     }
