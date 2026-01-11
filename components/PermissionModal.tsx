@@ -14,6 +14,7 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
   const [isCreating, setIsCreating] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showQR, setShowQR] = useState(false);
   const intervalRef = useRef<number | null>(null);
   const timeoutRef = useRef<number | null>(null);
 
@@ -50,13 +51,21 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
         signer_approval_url: data.signer_approval_url 
       });
 
-      // Warpcast içinde aç
-      try {
-        await sdk.actions.openUrl(data.signer_approval_url);
-      } catch (err) {
-        console.error('[PERMISSION] openUrl başarısız:', err);
-        // Fallback: yeni sekme
-        window.open(data.signer_approval_url, '_blank');
+      // Platform kontrolü
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        // Mobile: Farcaster app'te aç
+        try {
+          await sdk.actions.openUrl(data.signer_approval_url);
+        } catch (err) {
+          console.error('[PERMISSION] openUrl başarısız:', err);
+          // Fallback: browser ile aç
+          window.location.href = data.signer_approval_url;
+        }
+      } else {
+        // Desktop: QR code göster
+        setShowQR(true);
       }
 
       startPolling(data.signer_uuid);
@@ -79,7 +88,6 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
         const response = await fetch(`/api/check-signer?signer_uuid=${encodeURIComponent(signerUuid)}`);
         const data = await response.json().catch(() => ({}));
 
-        // Approved ve FID eşleşiyorsa tamamla
         if (response.ok && data?.status === 'approved' && Number(data?.fid) === userFid) {
           if (intervalRef.current) window.clearInterval(intervalRef.current);
           if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
@@ -102,9 +110,8 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
         if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
         setIsChecking(false);
       }
-    }, 3000); // 3 saniye
+    }, 3000);
 
-    // 3 dakika timeout
     timeoutRef.current = window.setTimeout(() => {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
       setIsChecking(false);
@@ -138,13 +145,25 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
 
         <p className="text-gray-400 text-center leading-relaxed mb-6">
           {isChecking
-            ? 'Please approve in the opened Warpcast screen. This will allow the app to unfollow on your behalf.'
+            ? (showQR 
+                ? 'Scan the QR code with your mobile device to approve in Warpcast.' 
+                : 'Please approve in the opened Warpcast screen.')
             : 'To unfollow users, you need to grant permission once. This is secure and handled by Farcaster.'}
         </p>
 
         {error && (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6 animate-shake">
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6">
             <p className="text-red-300 text-sm text-center">{error}</p>
+          </div>
+        )}
+
+        {showQR && signerData && (
+          <div className="bg-white p-4 rounded-xl mb-6">
+            <img 
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(signerData.signer_approval_url)}`}
+              alt="QR Code"
+              className="w-full h-auto"
+            />
           </div>
         )}
 
@@ -172,7 +191,7 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
           </div>
         )}
 
-        {isChecking && signerData && (
+        {isChecking && signerData && !showQR && (
           <div className="space-y-4">
             <div className="flex items-center justify-center gap-3 py-3">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-400"></div>
@@ -180,18 +199,11 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
             </div>
             
             <p className="text-xs text-gray-500 text-center">
-              Approve in the opened Warpcast screen. If it didn't open, tap below.
+              If the approval screen didn't open, tap below to try again.
             </p>
 
             <button
-              onClick={async () => {
-                if (!signerData?.signer_approval_url) return;
-                try {
-                  await sdk.actions.openUrl(signerData.signer_approval_url);
-                } catch {
-                  window.open(signerData.signer_approval_url, '_blank');
-                }
-              }}
+              onClick={() => window.location.href = signerData.signer_approval_url}
               className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold px-4 py-3 rounded-xl transition-all active:scale-95"
             >
               Open Approval Screen Again
