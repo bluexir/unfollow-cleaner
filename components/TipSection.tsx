@@ -5,17 +5,13 @@ import sdk from '@farcaster/frame-sdk';
 import { encodeFunctionData, parseEther, parseUnits } from 'viem';
 
 /**
- * Unfollow Cleaner - Tip (Bahşiş) Bileşeni
- * Base ağı üzerinde ETH, DEGEN ve USDC gönderimini sağlar.
+ * Unfollow Cleaner - Tip Section
+ * Send ETH, DEGEN, or USDC on Base network
  */
 
-// Senin cüzdan adresin
 const RECIPIENT_ADDRESS = '0xaDBd1712D5c6e2A4D7e08F50a9586d3C054E30c8';
-
-// Base mainnet ID (Hex formatı RPC istekleri için gereklidir)
 const BASE_CHAIN_ID_HEX = '0x2105'; // 8453
 
-// Base ağındaki token sözleşme adresleri
 const TOKENS = {
   DEGEN: '0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed',
   USDC: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
@@ -31,9 +27,9 @@ export default function TipSection() {
   const presets = useMemo(
     () => ({
       ETH: [
-        { label: '☕️', amount: '0.001', sub: '~$3' },
-        { label: '🍔', amount: '0.003', sub: '~$10' },
-        { label: '🚀', amount: '0.005', sub: '~$18' },
+        { label: '☕️', amount: '0.0003', sub: '~$1' },
+        { label: '🍔', amount: '0.001', sub: '~$3' },
+        { label: '🚀', amount: '0.0015', sub: '~$5' },
       ],
       DEGEN: [
         { label: '🎩', amount: '200', sub: 'DEGEN' },
@@ -41,9 +37,9 @@ export default function TipSection() {
         { label: '🎩', amount: '1000', sub: 'DEGEN' },
       ],
       USDC: [
-        { label: '💵', amount: '1', sub: 'USDC' },
-        { label: '💵', amount: '5', sub: 'USDC' },
-        { label: '💵', amount: '10', sub: 'USDC' },
+        { label: '💵', amount: '1', sub: '$1' },
+        { label: '💵', amount: '3', sub: '$3' },
+        { label: '💵', amount: '5', sub: '$5' },
       ],
     }),
     []
@@ -55,25 +51,24 @@ export default function TipSection() {
 
     try {
       const provider = sdk.wallet.ethProvider;
-      if (!provider) throw new Error('Farcaster cüzdan sağlayıcısı bulunamadı.');
+      if (!provider) throw new Error('Wallet provider not found 👻');
 
-      // 1. Ağ Kontrolü ve Base'e Geçiş
+      // 1. Switch to Base network
       try {
         await provider.request({
           method: 'wallet_switchEthereumChain',
           params: [{ chainId: BASE_CHAIN_ID_HEX }],
         });
       } catch (switchError) {
-        // Bazı cüzdanlar otomatik geçişi reddedebilir, devam edip şansımızı deniyoruz
-        console.warn("Ağ geçiş isteği reddedildi veya desteklenmiyor.");
+        console.warn("Network switch rejected or unsupported");
       }
 
-      // 2. Hesap Bağlantısı
+      // 2. Connect account
       const accounts = (await provider.request({ method: 'eth_requestAccounts', params: [] })) as string[];
       const from = accounts?.[0];
-      if (!from) throw new Error('Cüzdan bağlantısı kurulamadı.');
+      if (!from) throw new Error('Wallet connection failed 🔌');
 
-      // 3. İşlem Hazırlığı
+      // 3. Send transaction
       if (currency === 'ETH') {
         const value = parseEther(amountStr);
         const tx = {
@@ -84,11 +79,9 @@ export default function TipSection() {
 
         await provider.request({ method: 'eth_sendTransaction', params: [tx] });
       } else {
-        // Token Decimals Ayarı (USDC 6, DEGEN 18'dir)
         const decimals = currency === 'USDC' ? 6 : 18;
         const amount = parseUnits(amountStr, decimals);
 
-        // ERC-20 Transfer Fonksiyonu Kodlaması
         const data = encodeFunctionData({
           abi: [
             {
@@ -119,9 +112,9 @@ export default function TipSection() {
       setStatus('success');
       setTimeout(() => setStatus('idle'), 5000);
     } catch (e: any) {
-      console.error("İşlem hatası:", e);
+      console.error("Transaction error:", e);
       setStatus('error');
-      setError(e?.message || 'İşlem iptal edildi veya hata oluştu');
+      setError(e?.message || 'Oops! Something spooked the server 👻');
       setTimeout(() => {
         setStatus('idle');
         setError(null);
@@ -133,9 +126,9 @@ export default function TipSection() {
     <div data-testid="tip-section" className="border border-white/5 bg-black/40 backdrop-blur-md p-6 mt-12 rounded-2xl">
       <div className="max-w-md mx-auto text-center space-y-5">
         <div>
-          <h2 className="text-xl font-bold text-white">Geliştiriciye Tip</h2>
+          <h2 className="text-xl font-bold text-white">Tip the Developer</h2>
           <p className="text-gray-500 text-xs mt-1">
-            Tip göndermek için Warpcast cüzdanından onay vermen yeterli.
+            Send a tip by approving in your Warpcast wallet.
           </p>
         </div>
 
@@ -171,9 +164,9 @@ export default function TipSection() {
           </div>
         </div>
 
-        {status === 'pending' && <p className="text-yellow-300 text-xs animate-pulse">Cüzdan onayı bekleniyor…</p>}
-        {status === 'success' && <p className="text-green-300 text-xs">Teşekkürler! İşlem gönderildi.</p>}
-        {status === 'error' && <p className="text-red-300 text-xs">{error || 'Hata oluştu.'}</p>}
+        {status === 'pending' && <p className="text-yellow-300 text-xs animate-pulse">Awaiting wallet approval...</p>}
+        {status === 'success' && <p className="text-green-300 text-xs">Thank you! Transaction sent 🎉</p>}
+        {status === 'error' && <p className="text-red-300 text-xs">{error || 'Oops! The transaction escaped 👻'}</p>}
       </div>
     </div>
   );
