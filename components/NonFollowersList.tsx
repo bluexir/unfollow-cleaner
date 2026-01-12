@@ -16,6 +16,14 @@ interface NonFollower {
   neynar_score: number | null;
 }
 
+interface UserProfile {
+  fid: number;
+  username: string;
+  display_name: string;
+  pfp_url: string;
+  neynar_score: number | null;
+}
+
 interface NonFollowersListProps {
   userFid: number;
   signerUuid: string | null;
@@ -34,6 +42,8 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
     followers: number;
     nonFollowersCount: number;
   } | null>(null);
+
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   const [sessionCount, setSessionCount] = useState(0);
   const [showSharePopup, setShowSharePopup] = useState(false);
@@ -101,6 +111,7 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
 
       setNonFollowers(sorted);
       if (data.stats) setStats(data.stats);
+      if (data.userProfile) setUserProfile(data.userProfile);
       
       // Show ghost share popup if ghosts found
       if (sorted.length > 0) {
@@ -243,6 +254,34 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
   return (
     <div className="space-y-8 relative min-h-screen pb-32">
       
+      {/* USER PROFILE CARD */}
+      {userProfile && (
+        <div className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-500/30 rounded-2xl p-6 backdrop-blur-md shadow-xl shadow-purple-900/20">
+          <div className="flex items-center gap-4">
+            <img 
+              src={userProfile.pfp_url || 'https://warpcast.com/avatar.png'} 
+              alt={userProfile.username}
+              className="w-16 h-16 rounded-2xl border-2 border-purple-500/50 shadow-lg"
+            />
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold text-white">{userProfile.display_name}</h2>
+              <p className="text-purple-300 font-mono">@{userProfile.username}</p>
+            </div>
+            {userProfile.neynar_score !== null && (
+              <div className="bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-center">
+                <div className="text-xs text-purple-300 uppercase tracking-wider mb-1">Neynar Score</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">{getScoreBadge(userProfile.neynar_score)}</span>
+                  <span className={`text-2xl font-bold ${getScoreColor(userProfile.neynar_score)}`}>
+                    {userProfile.neynar_score.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {!signerUuid && !dismissedBanner && nonFollowers.length > 0 && (
         <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-2xl p-6 flex items-center justify-between backdrop-blur-sm shadow-lg shadow-purple-500/10">
           <div className="flex items-center gap-4">
