@@ -37,11 +37,13 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
 
   const [sessionCount, setSessionCount] = useState(0);
   const [showSharePopup, setShowSharePopup] = useState(false);
+  const [showGhostSharePopup, setShowGhostSharePopup] = useState(false);
 
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<{ type: 'unfollow' | 'bulk', fids?: number[] } | null>(null);
   
   const [dismissedBanner, setDismissedBanner] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('👻 Hunting ghosts...');
 
   const getScoreColor = (score: number | null) => {
     if (score === null) return "text-gray-500";
@@ -57,6 +59,26 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
     return "⚠️";
   };
 
+  // Loading animation
+  useEffect(() => {
+    if (!isLoading) return;
+    
+    const messages = [
+      '👻 Hunting ghosts...',
+      '🔍 Scanning followers...',
+      '✨ Almost there...',
+      '🕵️ Detecting non-followers...'
+    ];
+    
+    let index = 0;
+    const interval = setInterval(() => {
+      index = (index + 1) % messages.length;
+      setLoadingMessage(messages[index]);
+    }, 1500);
+    
+    return () => clearInterval(interval);
+  }, [isLoading]);
+
   useEffect(() => {
     fetchNonFollowers();
   }, [userFid]);
@@ -69,14 +91,24 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || 'Liste yüklenemedi');
+        throw new Error(data.error || 'Failed to load ghost list 👻');
       }
 
-      setNonFollowers(data.nonFollowers || []);
+      // Sort: Low score → High score (spam/bots first)
+      const sorted = (data.nonFollowers || []).sort((a: NonFollower, b: NonFollower) => 
+        (a.neynar_score || 0) - (b.neynar_score || 0)
+      );
+
+      setNonFollowers(sorted);
       if (data.stats) setStats(data.stats);
       
+      // Show ghost share popup if ghosts found
+      if (sorted.length > 0) {
+        setTimeout(() => setShowGhostSharePopup(true), 1000);
+      }
+      
     } catch (error: any) {
-      setError(error.message || 'Liste yüklenirken hata oluştu');
+      setError(error.message || 'Oops! The ghosts escaped 👻 Try again!');
     } finally {
       setIsLoading(false);
     }
@@ -128,7 +160,7 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'İşlem başarısız');
+      if (!response.ok) throw new Error(data.error || 'Something went wrong 😅');
 
       const deletedFids = new Set(fids);
       const remaining = nonFollowers.filter(u => !deletedFids.has(u.fid));
@@ -146,7 +178,7 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
       setSessionCount(prev => prev + data.unfollowed);
       
     } catch (error: any) {
-      setError(error.message || 'Unfollow işlemi başarısız');
+      setError(error.message || 'Unfollow hiccup! Give it another shot 🔄');
     } finally {
       setIsUnfollowing(false);
     }
@@ -185,7 +217,7 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
     return (
       <div className="flex flex-col items-center justify-center py-24 space-y-4">
         <div className="w-16 h-16 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin"></div>
-        <p className="text-sm font-mono text-gray-400 tracking-wider animate-pulse">ANALYZING DATA...</p>
+        <p className="text-sm font-mono text-gray-400 tracking-wider animate-pulse">{loadingMessage}</p>
       </div>
     );
   }
@@ -194,15 +226,15 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
     return (
       <div className="bg-gradient-to-br from-red-500/10 to-red-900/10 border border-red-500/30 p-8 rounded-2xl text-center backdrop-blur-sm shadow-xl">
         <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-3xl">⚠️</span>
+          <span className="text-3xl">👻</span>
         </div>
-        <p className="text-red-400 font-bold mb-2">ERROR</p>
+        <p className="text-red-400 font-bold mb-2">GHOST ALERT!</p>
         <p className="text-white mb-4">{error}</p>
         <button 
           onClick={fetchNonFollowers} 
           className="px-6 py-3 bg-red-600/30 hover:bg-red-600/50 text-red-200 rounded-xl border border-red-500/30 transition-all active:scale-95 font-semibold"
         >
-          Retry
+          Try Again
         </button>
       </div>
     );
@@ -241,7 +273,7 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
           </div>
           <div className="bg-black/60 p-8 flex flex-col items-center justify-center relative overflow-hidden group hover:bg-black/80 transition-colors">
             <div className="absolute inset-0 bg-gradient-to-br from-red-900/30 to-pink-900/30 group-hover:from-red-900/40 group-hover:to-pink-900/40 transition-colors"></div>
-            <span className="text-xs font-mono text-red-400 uppercase tracking-widest mb-2 z-10">NON-FOLLOWERS</span>
+            <span className="text-xs font-mono text-red-400 uppercase tracking-widest mb-2 z-10">GHOSTS</span>
             <span className="text-4xl font-bold text-red-500 font-mono z-10">{stats.nonFollowersCount}</span>
           </div>
         </div>
@@ -251,8 +283,8 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
         <>
           <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4 border-b border-purple-500/20 pb-4">
             <div>
-              <h2 className="text-2xl font-bold text-white">Detected Accounts</h2>
-              <p className="text-sm text-gray-500 mt-1">These people don't follow you back.</p>
+              <h2 className="text-2xl font-bold text-white">Detected Ghosts</h2>
+              <p className="text-sm text-gray-500 mt-1">Sorted by Neynar Score (low to high)</p>
             </div>
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-2 cursor-pointer group">
@@ -375,7 +407,7 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
             </svg>
           </div>
           <h3 className="text-3xl font-bold text-white mb-3">All Clean!</h3>
-          <p className="text-gray-400 text-lg">Everyone you follow follows you back.</p>
+          <p className="text-gray-400 text-lg">Everyone you follow follows you back. No ghosts here! 👻✨</p>
         </div>
       )}
 
@@ -404,6 +436,12 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
       )}
 
       {showSharePopup && <ShareCastPopup unfollowCount={sessionCount} onClose={() => setShowSharePopup(false)} />}
+      {showGhostSharePopup && nonFollowers.length > 0 && (
+        <ShareCastPopup 
+          ghostCount={nonFollowers.length} 
+          onClose={() => setShowGhostSharePopup(false)} 
+        />
+      )}
       {showPermissionModal && (
         <PermissionModal 
           userFid={userFid} 
