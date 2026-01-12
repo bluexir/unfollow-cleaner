@@ -10,15 +10,19 @@ export async function GET(req: NextRequest) {
 
     if (!fid) {
       return NextResponse.json(
-        { error: 'FID gerekli' },
+        { error: 'FID required' },
         { status: 400 }
       );
     }
 
     const userFid = parseInt(fid);
-    console.log('[GET-NON-FOLLOWERS] Başlatılıyor, FID:', userFid);
+    console.log('[GET-NON-FOLLOWERS] Starting, FID:', userFid);
 
-    // 1. Following listesini al (pagination ile)
+    // 0. Fetch user profile
+    const { users: userProfiles } = await neynarClient.fetchBulkUsers({ fids: [userFid] });
+    const userProfile = userProfiles[0];
+
+    // 1. Fetch following list (with pagination)
     let followingList: any[] = [];
     let followingCursor: string | null = null;
 
@@ -36,9 +40,9 @@ export async function GET(req: NextRequest) {
 
     } while (followingCursor);
 
-    console.log('[GET-NON-FOLLOWERS] Toplam following:', followingList.length);
+    console.log('[GET-NON-FOLLOWERS] Total following:', followingList.length);
 
-    // 2. Followers listesini al (pagination ile)
+    // 2. Fetch followers list (with pagination)
     let followersList: any[] = [];
     let followersCursor: string | null = null;
 
@@ -56,19 +60,19 @@ export async function GET(req: NextRequest) {
 
     } while (followersCursor);
 
-    console.log('[GET-NON-FOLLOWERS] Toplam followers:', followersList.length);
+    console.log('[GET-NON-FOLLOWERS] Total followers:', followersList.length);
 
-    // 3. Followers FID set'i oluştur (u.user.fid ile!)
+    // 3. Create followers FID set (with type casting!)
     const followerFids = new Set(followersList.map((u: any) => Number(u.user?.fid)));
 
     console.log('[GET-NON-FOLLOWERS] Follower FIDs set size:', followerFids.size);
 
-    // 4. Non-followers'ı filtrele (u.user.fid ile!)
+    // 4. Filter non-followers (with type casting!)
     const nonFollowers = followingList.filter((follow: any) => !followerFids.has(Number(follow.user?.fid)));
 
-    console.log('[GET-NON-FOLLOWERS] Non-followers sayısı:', nonFollowers.length);
+    console.log('[GET-NON-FOLLOWERS] Non-followers count:', nonFollowers.length);
 
-    // 5. Formatlı veri döndür (u.user.* ile!)
+    // 5. Format and return data (with u.user.*)
     const formattedNonFollowers = nonFollowers.map((follow: any) => {
       const user = follow.user;
       return {
@@ -88,13 +92,20 @@ export async function GET(req: NextRequest) {
         following: followingList.length,
         followers: followersList.length,
         nonFollowersCount: nonFollowers.length
+      },
+      userProfile: {
+        fid: userProfile.fid,
+        username: userProfile.username,
+        display_name: userProfile.display_name || userProfile.username,
+        pfp_url: userProfile.pfp_url,
+        neynar_score: userProfile.score || userProfile.experimental?.neynar_user_score || null
       }
     });
 
   } catch (error: any) {
-    console.error('[GET-NON-FOLLOWERS] Hata:', error);
+    console.error('[GET-NON-FOLLOWERS] Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Liste alınamadı' },
+      { error: error.message || 'Failed to fetch list' },
       { status: 500 }
     );
   }
