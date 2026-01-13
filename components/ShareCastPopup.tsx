@@ -16,7 +16,7 @@ export default function ShareCastPopup({ unfollowCount, ghostCount, onClose }: S
   const isGhostShare = ghostCount !== undefined && ghostCount > 0;
   const count = isGhostShare ? ghostCount : (unfollowCount || 0);
 
-  const handleShare = async () => {
+  const handleShare = () => {
     setIsSharing(true);
     
     // Paylaşım mesajı
@@ -24,22 +24,15 @@ export default function ShareCastPopup({ unfollowCount, ghostCount, onClose }: S
       ? `I found ${count} ghost${count === 1 ? '' : 's'} on Farcaster! 👻 Who doesn't follow me back? Clean yours with Unfollow Cleaner 🧹`
       : `I just unfollowed ${count} ghost${count === 1 ? '' : 's'} who don't follow me back! 🧹 Clean up your Farcaster with Unfollow Cleaner`;
     
+    const shareUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${window.location.origin}`;
+    
     try {
-      // Farcaster Mini App içinde composer aç (yeni sekme YOK!)
-      if (typeof sdk !== 'undefined' && sdk.actions?.composeCast) {
-        await sdk.actions.composeCast({
-          text: text,
-          embeds: [window.location.origin]
-        });
+      if (typeof sdk !== 'undefined' && sdk.actions?.openUrl) {
+        sdk.actions.openUrl(shareUrl);
       } else {
-        // Fallback: Web browser için
-        const shareUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${window.location.origin}`;
         window.open(shareUrl, '_blank');
       }
     } catch (error) {
-      console.error('[SHARE] Error:', error);
-      // Fallback
-      const shareUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${window.location.origin}`;
       window.open(shareUrl, '_blank');
     }
     
