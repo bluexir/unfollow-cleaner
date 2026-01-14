@@ -14,7 +14,19 @@ export async function GET() {
       homeUrl: "https://unfollow-cleaner.vercel.app",
       splashImageUrl: "https://unfollow-cleaner.vercel.app/icon.png",
       splashBackgroundColor: "#0f1117",
-      webhookUrl: "https://unfollow-cleaner.vercel.app/api/webhook"
+      webhookUrl: "https://unfollow-cleaner.vercel.app/api/webhook",
+      
+      // EKLENEN ALANLAR (Arama için kritik!)
+      subtitle: "Find your ghosts on Farcaster",
+      description: "Discover who doesn't follow you back on Farcaster. Sort by Neynar quality score and clean up with one tap. No spam, just real insights.",
+      primaryCategory: "social",
+      tags: ["social", "tools", "analytics", "followers"],
+      tagline: "Clean up your Farcaster follow list instantly",
+      
+      // OG Tags (Paylaşım için)
+      ogTitle: "Unfollow Cleaner - Find Your Farcaster Ghosts",
+      ogDescription: "Discover who doesn't follow you back and clean up with one tap",
+      ogImageUrl: "https://unfollow-cleaner.vercel.app/icon.png"
     }
   };
 
