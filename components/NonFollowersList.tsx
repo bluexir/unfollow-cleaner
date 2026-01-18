@@ -474,10 +474,11 @@ export default function NonFollowersList({ userFid, signerUuid, onSignerGranted 
         </div>
       )}
 
-      {showSharePopup && <ShareCastPopup unfollowCount={sessionCount} onClose={() => setShowSharePopup(false)} />}
+    {showSharePopup && <ShareCastPopup unfollowCount={sessionCount} userScore={userProfile?.neynar_score || null} onClose={() => setShowSharePopup(false)} />}
       {showGhostSharePopup && nonFollowers.length > 0 && (
         <ShareCastPopup 
-          ghostCount={nonFollowers.length} 
+          ghostCount={nonFollowers.length}
+          userScore={userProfile?.neynar_score || null}
           onClose={() => setShowGhostSharePopup(false)} 
         />
       )}
