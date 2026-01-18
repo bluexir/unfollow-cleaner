@@ -4,12 +4,13 @@ import { useState } from 'react';
 import sdk from '@farcaster/frame-sdk';
 
 interface ShareCastPopupProps {
-  unfollowCount?: number; // Unfollow sonrası için
-  ghostCount?: number; // Ghost bulunca için
+  unfollowCount?: number;
+  ghostCount?: number;
+  userScore?: number | null;
   onClose: () => void;
 }
 
-export default function ShareCastPopup({ unfollowCount, ghostCount, onClose }: ShareCastPopupProps) {
+export default function ShareCastPopup({ unfollowCount, ghostCount, userScore, onClose }: ShareCastPopupProps) {
   const [isSharing, setIsSharing] = useState(false);
 
   // Share type: ghost bulma veya unfollow
@@ -19,10 +20,13 @@ export default function ShareCastPopup({ unfollowCount, ghostCount, onClose }: S
   const handleShare = () => {
     setIsSharing(true);
     
+    // Neynar Score text
+    const scoreText = userScore ? ` My Neynar Score: ${userScore.toFixed(2)} ⭐` : '';
+    
     // Paylaşım mesajı
     const text = isGhostShare
-      ? `I found ${count} ghost${count === 1 ? '' : 's'} on Farcaster! 👻 Who doesn't follow me back? Clean yours with Unfollow Cleaner 🧹`
-      : `I just unfollowed ${count} ghost${count === 1 ? '' : 's'} who don't follow me back! 🧹 Clean up your Farcaster with Unfollow Cleaner`;
+      ? `I found ${count} ghost${count === 1 ? '' : 's'} on Farcaster! 👻${scoreText} Clean yours with Unfollow Cleaner 🧹 By @bluexir`
+      : `I just unfollowed ${count} ghost${count === 1 ? '' : 's'}!${scoreText} 🧹 Clean up with Unfollow Cleaner By @bluexir`;
     
     const shareUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${window.location.origin}`;
     
@@ -70,8 +74,8 @@ export default function ShareCastPopup({ unfollowCount, ghostCount, onClose }: S
         <div className="bg-black/40 border border-purple-500/20 rounded-xl p-4 mb-6">
           <p className="text-sm text-gray-300 leading-relaxed">
             {isGhostShare
-              ? `"I found ${count} ghost${count === 1 ? '' : 's'} on Farcaster! 👻 Clean yours with Unfollow Cleaner 🧹"`
-              : `"I just unfollowed ${count} ghost${count === 1 ? '' : 's'} who don't follow me back! 🧹"`
+              ? `"I found ${count} ghost${count === 1 ? '' : 's'} on Farcaster! 👻${userScore ? ` My Neynar Score: ${userScore.toFixed(2)} ⭐` : ''} Clean yours with Unfollow Cleaner 🧹 By @bluexir"`
+              : `"I just unfollowed ${count} ghost${count === 1 ? '' : 's'}!${userScore ? ` My Neynar Score: ${userScore.toFixed(2)} ⭐` : ''} 🧹 Clean up with Unfollow Cleaner By @bluexir"`
             }
           </p>
         </div>
