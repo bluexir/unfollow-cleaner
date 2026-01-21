@@ -313,6 +313,12 @@ export async function GET(req: NextRequest) {
       if (!profileFollowerFids.has(fid)) hiddenFollowerFids.add(fid);
     }
 
+    const hiddenFollowersEdges: NeynarUserEdge[] = [];
+    for (const fid of hiddenFollowerFids.values()) {
+      const e = rawFollowersByFid.get(fid);
+      if (e) hiddenFollowersEdges.push(e);
+    }
+
     const hiddenMutualEdges: NeynarUserEdge[] = [];
     for (const [fid] of followingByFid.entries()) {
       if (hiddenFollowerFids.has(fid)) {
@@ -345,6 +351,7 @@ export async function GET(req: NextRequest) {
         event: "computed",
         non_followers_real: nonFollowersRealEdges.length,
         non_followers_profile: nonFollowersProfileEdges.length,
+        hidden_followers: hiddenFollowersEdges.length,
         hidden_mutuals: hiddenMutualEdges.length,
       })
     );
@@ -353,6 +360,7 @@ export async function GET(req: NextRequest) {
       request_id: requestId,
       nonFollowersReal: nonFollowersRealEdges.map(formatEdge),
       nonFollowersProfile: nonFollowersProfileEdges.map(formatEdge),
+      hiddenFollowers: hiddenFollowersEdges.map(formatEdge),
       hiddenMutuals: hiddenMutualEdges.map(formatEdge),
       stats: {
         following: followingByFid.size,
@@ -362,6 +370,7 @@ export async function GET(req: NextRequest) {
         hidden_followers_total: hiddenFollowerFids.size,
         nonFollowersRealCount: nonFollowersRealEdges.length,
         nonFollowersProfileCount: nonFollowersProfileEdges.length,
+        hiddenFollowersCount: hiddenFollowersEdges.length,
         hiddenMutualsCount: hiddenMutualEdges.length,
         profile_source: strictMinScore !== null ? "strict" : "visible_experimental",
         strict_min_score: strictMinScore,
