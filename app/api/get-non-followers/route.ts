@@ -12,13 +12,10 @@ type NeynarUser = {
   follower_count?: number;
   power_badge?: boolean;
   score?: number;
+  neynar_user_score?: number;
   experimental?: {
     neynar_user_score?: number;
-    spam_label?: string;
-    spam_label_score?: number;
   };
-  spam_label?: string;
-  spam_label_score?: number;
 };
 
 type NeynarUserEdge = {
@@ -35,41 +32,24 @@ function toNumber(v: any): number | null {
 }
 
 function clamp01(n: number) {
-  return Math.max(0, Math.min(1, n));
+  if (n < 0) return 0;
+  if (n > 1) return 1;
+  return n;
 }
 
-function toBool(v: string | null, fallback: boolean) {
-  if (v === null) return fallback;
-  const s = v.trim().toLowerCase();
-  if (s === "1" || s === "true" || s === "yes" || s === "y") return true;
-  if (s === "0" || s === "false" || s === "no" || s === "n") return false;
-  return fallback;
-}
-
-function getScore(u?: NeynarUser): number | null {
+function getQualityScore(u?: NeynarUser): number | null {
   if (!u) return null;
-  const a = toNumber((u as any).score);
-  if (a !== null) return a;
-  const b = toNumber((u as any)?.experimental?.neynar_user_score);
-  if (b !== null) return b;
-  const c = toNumber((u as any).neynar_user_score);
-  if (c !== null) return c;
-  return null;
-}
 
-function getSpamLabel(u?: NeynarUser): string | null {
-  if (!u) return null;
-  const a = (u as any)?.spam_label;
-  if (typeof a === "string" && a.trim()) return a.trim();
-  const b = (u as any)?.experimental?.spam_label;
-  if (typeof b === "string" && b.trim()) return b.trim();
-  return null;
-}
+  const e = toNumber((u as any)?.experimental?.neynar_user_score);
+  if (e !== null) return clamp01(e);
 
-function isSpamLabel(label: string | null) {
-  if (!label) return false;
-  const s = label.toLowerCase();
-  return s.includes("spam") || s.includes("bot") || s.includes("scam");
+  const a = toNumber((u as any)?.neynar_user_score);
+  if (a !== null) return clamp01(a);
+
+  const b = toNumber((u as any)?.score);
+  if (b !== null && b >= 0 && b <= 1) return b;
+
+  return null;
 }
 
 function formatEdge(edge: NeynarUserEdge) {
@@ -81,39 +61,24 @@ function formatEdge(edge: NeynarUserEdge) {
     pfp_url: u.pfp_url,
     follower_count: u.follower_count || 0,
     power_badge: u.power_badge || false,
-    neynar_score: getScore(u),
-    spam_label: getSpamLabel(u),
+    neynar_score: getQualityScore(u),
   };
 }
 
-function getStrictMinScoreMaybe(req: NextRequest) {
-  const hasQuery = req.nextUrl.searchParams.has("strict_min_score");
-  const q = req.nextUrl.searchParams.get("strict_min_score");
-  const fromQuery = toNumber(q);
-  if (hasQuery) return clamp01(fromQuery ?? 0);
-
-  const fromEnv = toNumber(process.env.STRICT_MIN_SCORE);
-  if (fromEnv !== null) return clamp01(fromEnv);
-
-  return null;
+function getOptionalNumber(req: NextRequest, key: string): number | null {
+  const q = req.nextUrl.searchParams.get(key);
+  if (q === null || q === undefined || q === "") return null;
+  const n = toNumber(q);
+  return n === null ? null : n;
 }
 
-function getLowQualityMaxScore(req: NextRequest) {
-  const q = req.nextUrl.searchParams.get("low_quality_max_score");
-  const fromQuery = toNumber(q);
-  if (fromQuery !== null) return clamp01(fromQuery);
-  const fromEnv = toNumber(process.env.LOW_QUALITY_MAX_SCORE);
-  if (fromEnv !== null) return clamp01(fromEnv);
-  return 0.35;
-}
-
-function getIncludeMissingScore(req: NextRequest) {
-  const q = req.nextUrl.searchParams.get("include_missing_score");
-  const fromQuery = q === null ? null : toBool(q, true);
-  if (fromQuery !== null) return fromQuery;
-  const fromEnv = process.env.INCLUDE_MISSING_SCORE;
-  if (typeof fromEnv === "string") return toBool(fromEnv, true);
-  return true;
+function getOptionalBool(req: NextRequest, key: string, fallback: boolean) {
+  const q = req.nextUrl.searchParams.get(key);
+  if (!q) return fallback;
+  const s = q.trim().toLowerCase();
+  if (s === "1" || s === "true" || s === "yes" || s === "y") return true;
+  if (s === "0" || s === "false" || s === "no" || s === "n") return false;
+  return fallback;
 }
 
 async function fetchAllFollowing(args: { requestId: string; fid: number; viewerFid?: number }) {
@@ -130,10 +95,7 @@ async function fetchAllFollowing(args: { requestId: string; fid: number; viewerF
 
     const params: any = { fid, limit: 100 };
     if (cursor) params.cursor = cursor;
-    if (typeof viewerFid === "number") {
-      params.viewerFid = viewerFid;
-      params.viewer_fid = viewerFid;
-    }
+    if (typeof viewerFid === "number") params.viewer_fid = viewerFid;
 
     const resp: any = await neynarClientRaw.fetchUserFollowing(params);
     const batch: NeynarUserEdge[] = resp?.users || [];
@@ -171,8 +133,9 @@ async function fetchAllFollowers(args: {
   fid: number;
   mode: "raw" | "visible";
   viewerFid?: number;
+  sortType?: "desc_chron" | "algorithmic";
 }) {
-  const { requestId, fid, mode, viewerFid } = args;
+  const { requestId, fid, mode, viewerFid, sortType } = args;
   const started = nowMs();
 
   const client = mode === "visible" ? neynarClientVisible : neynarClientRaw;
@@ -187,10 +150,8 @@ async function fetchAllFollowers(args: {
 
     const params: any = { fid, limit: 100 };
     if (cursor) params.cursor = cursor;
-    if (typeof viewerFid === "number") {
-      params.viewerFid = viewerFid;
-      params.viewer_fid = viewerFid;
-    }
+    if (typeof viewerFid === "number") params.viewer_fid = viewerFid;
+    if (sortType) params.sort_type = sortType;
 
     const resp: any = await client.fetchUserFollowers(params);
     const batch: NeynarUserEdge[] = resp?.users || [];
@@ -225,31 +186,41 @@ async function fetchAllFollowers(args: {
   return { list, total, pages };
 }
 
-async function fetchBulkUsersAll(args: { requestId: string; fids: number[] }) {
-  const { requestId, fids } = args;
+async function fetchBulkUsersVisible(args: { requestId: string; fids: number[]; viewerFid?: number }) {
+  const { requestId, fids, viewerFid } = args;
   const started = nowMs();
 
-  const byFid = new Map<number, NeynarUser>();
-  const chunkSize = 100;
-  let chunk = 0;
+  const map = new Map<number, NeynarUser>();
+  const chunks: number[][] = [];
+  for (let i = 0; i < fids.length; i += 100) chunks.push(fids.slice(i, i + 100));
 
-  for (let i = 0; i < fids.length; i += chunkSize) {
-    chunk += 1;
-    const part = fids.slice(i, i + chunkSize);
-    const resp: any = await neynarClientVisible.fetchBulkUsers({ fids: part } as any);
+  let chunkIndex = 0;
+  let requestedTotal = 0;
+  let returnedTotal = 0;
+
+  for (const chunk of chunks) {
+    chunkIndex += 1;
+    requestedTotal += chunk.length;
+
+    const params: any = { fids: chunk.join(",") };
+    if (typeof viewerFid === "number") params.viewer_fid = viewerFid;
+
+    const resp: any = await neynarClientVisible.fetchBulkUsers(params);
     const users: NeynarUser[] = resp?.users || [];
 
     for (const u of users) {
       const fid = toNumber(u?.fid);
-      if (fid) byFid.set(fid, u);
+      if (fid) map.set(fid, u);
     }
+
+    returnedTotal += users.length;
 
     console.log(
       JSON.stringify({
         request_id: requestId,
         event: "bulk_users_chunk",
-        chunk,
-        requested: part.length,
+        chunk: chunkIndex,
+        requested: chunk.length,
         returned: users.length,
       })
     );
@@ -259,14 +230,14 @@ async function fetchBulkUsersAll(args: { requestId: string; fids: number[] }) {
     JSON.stringify({
       request_id: requestId,
       event: "bulk_users_done",
-      requested_total: fids.length,
-      returned_total: byFid.size,
-      chunks: chunk,
+      requested_total: requestedTotal,
+      returned_total: returnedTotal,
+      chunks: chunks.length,
       ms: nowMs() - started,
     })
   );
 
-  return byFid;
+  return map;
 }
 
 export async function GET(req: NextRequest) {
@@ -282,9 +253,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "FID required", request_id: requestId }, { status: 400 });
     }
 
-    const strictMinScore = getStrictMinScoreMaybe(req);
-    const lowQualityMaxScore = getLowQualityMaxScore(req);
-    const includeMissingScore = getIncludeMissingScore(req);
+    const strictMinScoreRaw = getOptionalNumber(req, "strict_min_score");
+    const strictMinScore = strictMinScoreRaw === null ? null : clamp01(strictMinScoreRaw);
+
+    const lowQualityMaxScoreRaw = getOptionalNumber(req, "low_quality_max_score");
+    const lowQualityMaxScore = lowQualityMaxScoreRaw === null ? null : clamp01(lowQualityMaxScoreRaw);
+
+    const includeMissingScore = getOptionalBool(req, "include_missing_score", true);
 
     console.log(
       JSON.stringify({
@@ -297,142 +272,109 @@ export async function GET(req: NextRequest) {
       })
     );
 
+    const { users: userProfiles }: any = await neynarClientVisible.fetchBulkUsers({ fids: String(userFid) } as any);
+    const userProfile = userProfiles?.[0];
+    if (!userProfile) {
+      console.log(JSON.stringify({ request_id: requestId, event: "profile_missing", fid: userFid }));
+      return NextResponse.json({ error: "User not found", request_id: requestId }, { status: 404 });
+    }
+
     const following = await fetchAllFollowing({ requestId, fid: userFid, viewerFid: userFid });
-    const rawFollowers = await fetchAllFollowers({ requestId, fid: userFid, mode: "raw", viewerFid: userFid });
+
+    const rawFollowers = await fetchAllFollowers({
+      requestId,
+      fid: userFid,
+      mode: "raw",
+      viewerFid: userFid,
+      sortType: "desc_chron",
+    });
+
     const visibleFollowers = await fetchAllFollowers({
       requestId,
       fid: userFid,
       mode: "visible",
       viewerFid: userFid,
+      sortType: "desc_chron",
     });
 
     const followingByFid = new Map<number, NeynarUserEdge>();
-    const followingFids: number[] = [];
     for (const edge of following.list) {
       const f = toNumber(edge?.user?.fid);
-      if (f) {
-        followingByFid.set(f, edge);
-        followingFids.push(f);
-      }
+      if (f) followingByFid.set(f, edge);
     }
 
-    const rawFollowerFids = new Set<number>();
     const rawFollowersByFid = new Map<number, NeynarUserEdge>();
     for (const edge of rawFollowers.list) {
       const f = toNumber(edge?.user?.fid);
-      if (f) {
-        rawFollowerFids.add(f);
-        rawFollowersByFid.set(f, edge);
-      }
+      if (f) rawFollowersByFid.set(f, edge);
     }
 
-    const visibleFollowerFids = new Set<number>();
+    const profileFollowersByFid = new Map<number, NeynarUserEdge>();
     for (const edge of visibleFollowers.list) {
       const f = toNumber(edge?.user?.fid);
-      if (f) visibleFollowerFids.add(f);
+      if (f) profileFollowersByFid.set(f, edge);
     }
 
-    let profileFollowerFids = visibleFollowerFids;
-
-    const strictVisibleFollowerFids = new Set<number>();
-    const strictLabelCounts: Record<string, number> = {};
-    let strictSpamRejected = 0;
-    let strictScoreRejected = 0;
-    let strictMissingScore = 0;
-
+    let profileSource: "visible_experimental" | "visible_experimental_strict" = "visible_experimental";
     if (strictMinScore !== null) {
-      for (const edge of rawFollowers.list) {
-        const u = edge.user;
-        const fid = toNumber(u?.fid);
-        if (!fid) continue;
-
-        const label = getSpamLabel(u);
-        if (label) strictLabelCounts[label] = (strictLabelCounts[label] || 0) + 1;
-
-        if (isSpamLabel(label)) {
-          strictSpamRejected += 1;
-          continue;
-        }
-
-        if (u?.power_badge) {
-          strictVisibleFollowerFids.add(fid);
-          continue;
-        }
-
-        const score = getScore(u);
+      profileSource = "visible_experimental_strict";
+      for (const [fid, edge] of Array.from(profileFollowersByFid.entries())) {
+        const score = getQualityScore(edge.user);
         if (score === null) {
-          strictMissingScore += 1;
+          profileFollowersByFid.delete(fid);
           continue;
         }
-
         if (score < strictMinScore) {
-          strictScoreRejected += 1;
-          continue;
+          profileFollowersByFid.delete(fid);
         }
-
-        strictVisibleFollowerFids.add(fid);
       }
-
-      profileFollowerFids = strictVisibleFollowerFids;
     }
 
-    const nonFollowersRealEdges: NeynarUserEdge[] = [];
-    for (const [fid, edge] of followingByFid.entries()) {
-      if (!rawFollowerFids.has(fid)) nonFollowersRealEdges.push(edge);
-    }
+    const followingFids = new Set<number>(followingByFid.keys());
+    const rawFollowerFids = new Set<number>(rawFollowersByFid.keys());
+    const profileFollowerFids = new Set<number>(profileFollowersByFid.keys());
 
     const nonFollowersProfileEdges: NeynarUserEdge[] = [];
     for (const [fid, edge] of followingByFid.entries()) {
       if (!profileFollowerFids.has(fid)) nonFollowersProfileEdges.push(edge);
     }
 
-    const hiddenFollowerFids = new Set<number>();
-    for (const fid of rawFollowerFids.values()) {
-      if (!profileFollowerFids.has(fid)) hiddenFollowerFids.add(fid);
-    }
-
     const hiddenFollowersEdges: NeynarUserEdge[] = [];
-    for (const fid of hiddenFollowerFids.values()) {
-      const e = rawFollowersByFid.get(fid);
-      if (e) hiddenFollowersEdges.push(e);
+    for (const [fid, edge] of rawFollowersByFid.entries()) {
+      if (!profileFollowerFids.has(fid)) hiddenFollowersEdges.push(edge);
     }
 
     const hiddenMutualEdges: NeynarUserEdge[] = [];
-    for (const [fid] of followingByFid.entries()) {
-      if (hiddenFollowerFids.has(fid)) {
-        const followerEdge = rawFollowersByFid.get(fid);
-        if (followerEdge) hiddenMutualEdges.push(followerEdge);
+    for (const edge of hiddenFollowersEdges) {
+      const fid = toNumber(edge?.user?.fid);
+      if (!fid) continue;
+      if (followingFids.has(fid)) {
+        hiddenMutualEdges.push(followingByFid.get(fid) || edge);
       }
     }
 
-    const followingUsersByFid = await fetchBulkUsersAll({ requestId, fids: followingFids });
+    let lowQualityFollowingEdges: NeynarUserEdge[] = [];
+    let reasons = { low_score: 0, missing_score: 0 };
+    if (lowQualityMaxScore !== null) {
+      const fids = Array.from(followingByFid.keys());
+      const bulk = await fetchBulkUsersVisible({ requestId, fids, viewerFid: userFid });
 
-    const filteredFollowingEdges: NeynarUserEdge[] = [];
-    const reasons = { spam_label: 0, low_score: 0, missing_score: 0 };
-
-    for (const [fid, edge] of followingByFid.entries()) {
-      const u = followingUsersByFid.get(fid);
-      const label = getSpamLabel(u);
-      const score = getScore(u);
-
-      const spamHit = isSpamLabel(label);
-      const missingHit = score === null && includeMissingScore;
-      const lowHit = score !== null && score <= lowQualityMaxScore;
-
-      if (spamHit || missingHit || lowHit) {
-        if (spamHit) reasons.spam_label += 1;
-        else if (missingHit) reasons.missing_score += 1;
-        else if (lowHit) reasons.low_score += 1;
-
-        filteredFollowingEdges.push({
-          user: {
-            ...(edge.user || {}),
-            score: u?.score ?? (edge.user as any)?.score,
-            experimental: u?.experimental ?? (edge.user as any)?.experimental,
-            spam_label: (u as any)?.spam_label ?? (edge.user as any)?.spam_label,
-            spam_label_score: (u as any)?.spam_label_score ?? (edge.user as any)?.spam_label_score,
-          },
-        });
+      for (const fid of fids) {
+        const u = bulk.get(fid);
+        const score = getQualityScore(u);
+        if (score === null) {
+          if (includeMissingScore) {
+            const edge = followingByFid.get(fid);
+            if (edge) lowQualityFollowingEdges.push(edge);
+            reasons.missing_score += 1;
+          }
+          continue;
+        }
+        if (score <= lowQualityMaxScore) {
+          const edge = followingByFid.get(fid);
+          if (edge) lowQualityFollowingEdges.push(edge);
+          reasons.low_score += 1;
+        }
       }
     }
 
@@ -442,15 +384,11 @@ export async function GET(req: NextRequest) {
         event: "sets_ready",
         following: followingByFid.size,
         followers_raw: rawFollowerFids.size,
-        followers_visible_experimental: visibleFollowerFids.size,
-        profile_source: strictMinScore !== null ? "strict" : "visible_experimental",
+        followers_visible_experimental: visibleFollowers.total,
+        profile_source: profileSource,
         followers_profile: profileFollowerFids.size,
-        hidden_followers_total: hiddenFollowerFids.size,
+        hidden_followers_total: hiddenFollowersEdges.length,
         strict_min_score: strictMinScore,
-        strict_spam_rejected: strictSpamRejected,
-        strict_score_rejected: strictScoreRejected,
-        strict_missing_score: strictMissingScore,
-        strict_labels: strictLabelCounts,
       })
     );
 
@@ -458,11 +396,10 @@ export async function GET(req: NextRequest) {
       JSON.stringify({
         request_id: requestId,
         event: "computed",
-        non_followers_real: nonFollowersRealEdges.length,
         non_followers_profile: nonFollowersProfileEdges.length,
         hidden_followers: hiddenFollowersEdges.length,
         hidden_mutuals: hiddenMutualEdges.length,
-        filtered_following: filteredFollowingEdges.length,
+        low_quality_following: lowQualityFollowingEdges.length,
         reasons,
         low_quality_max_score: lowQualityMaxScore,
         include_missing_score: includeMissingScore,
@@ -471,35 +408,34 @@ export async function GET(req: NextRequest) {
 
     const response = {
       request_id: requestId,
-      nonFollowersReal: nonFollowersRealEdges.map(formatEdge),
-      nonFollowersProfile: nonFollowersProfileEdges.map(formatEdge),
+      nonFollowers: nonFollowersProfileEdges.map(formatEdge),
       hiddenFollowers: hiddenFollowersEdges.map(formatEdge),
       hiddenMutuals: hiddenMutualEdges.map(formatEdge),
-      filteredFollowing: filteredFollowingEdges.map(formatEdge),
+      lowQualityFollowing: lowQualityFollowingEdges.map(formatEdge),
       stats: {
-        following: followingByFid.size,
-        followers_raw: rawFollowerFids.size,
-        followers_visible_experimental: visibleFollowerFids.size,
+        following: following.total,
+        followers: profileFollowerFids.size,
+        followers_raw: rawFollowers.total,
+        followers_visible_experimental: visibleFollowers.total,
         followers_profile: profileFollowerFids.size,
-        hidden_followers_total: hiddenFollowerFids.size,
-        nonFollowersRealCount: nonFollowersRealEdges.length,
-        nonFollowersProfileCount: nonFollowersProfileEdges.length,
+        nonFollowersCount: nonFollowersProfileEdges.length,
         hiddenFollowersCount: hiddenFollowersEdges.length,
         hiddenMutualsCount: hiddenMutualEdges.length,
-        filteredFollowingCount: filteredFollowingEdges.length,
-        profile_source: strictMinScore !== null ? "strict" : "visible_experimental",
+        lowQualityFollowingCount: lowQualityFollowingEdges.length,
         strict_min_score: strictMinScore,
-        strict_spam_rejected: strictSpamRejected,
-        strict_score_rejected: strictScoreRejected,
-        strict_missing_score: strictMissingScore,
         low_quality_max_score: lowQualityMaxScore,
         include_missing_score: includeMissingScore,
-        filteredFollowingReasons: reasons,
+      },
+      userProfile: {
+        fid: userProfile.fid,
+        username: userProfile.username,
+        display_name: userProfile.display_name || userProfile.username,
+        pfp_url: userProfile.pfp_url,
+        neynar_score: getQualityScore(userProfile) ?? null,
       },
     };
 
     console.log(JSON.stringify({ request_id: requestId, event: "done", ms: nowMs() - started }));
-
     return NextResponse.json(response);
   } catch (error: any) {
     console.error(
