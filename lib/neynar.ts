@@ -4,7 +4,11 @@ if (!process.env.NEYNAR_API_KEY) {
   throw new Error("NEYNAR_API_KEY ortam değişkeni eksik!");
 }
 
-const config = new Configuration({
+const rawConfig = new Configuration({
+  apiKey: process.env.NEYNAR_API_KEY,
+});
+
+const visibleConfig = new Configuration({
   apiKey: process.env.NEYNAR_API_KEY,
   baseOptions: {
     headers: {
@@ -13,4 +17,13 @@ const config = new Configuration({
   },
 });
 
-export const neynarClient = new NeynarAPIClient(config);
+export const neynarClientRaw = new NeynarAPIClient(rawConfig);
+export const neynarClientVisible = new NeynarAPIClient(visibleConfig);
+
+export const neynarClient = neynarClientVisible;
+
+export type NeynarMode = "raw" | "visible";
+
+export function getNeynarClient(mode: NeynarMode) {
+  return mode === "raw" ? neynarClientRaw : neynarClientVisible;
+}
