@@ -1,7 +1,7 @@
 import { NeynarAPIClient, Configuration } from "@neynar/nodejs-sdk";
 
 if (!process.env.NEYNAR_API_KEY) {
-  throw new Error("NEYNAR_API_KEY ortam değişkeni eksik!");
+  throw new Error("NEYNAR_API_KEY missing");
 }
 
 const rawConfig = new Configuration({
@@ -19,7 +19,6 @@ const visibleConfig = new Configuration({
 
 export const neynarClientRaw = new NeynarAPIClient(rawConfig);
 export const neynarClientVisible = new NeynarAPIClient(visibleConfig);
-
 export const neynarClient = neynarClientVisible;
 
 export type NeynarMode = "raw" | "visible";
