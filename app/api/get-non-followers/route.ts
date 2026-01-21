@@ -4,45 +4,97 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { neynarClientRaw, neynarClientVisible } from "@/lib/neynar";
 
-type NeynarUserEdge = {
-  user?: {
-    fid?: number;
-    username?: string;
-    display_name?: string;
-    pfp_url?: string;
-    follower_count?: number;
-    power_badge?: boolean;
-    score?: number;
-    experimental?: {
-      neynar_user_score?: number;
-    };
+type NeynarUser = {
+  fid?: number;
+  username?: string;
+  display_name?: string;
+  pfp_url?: string;
+  follower_count?: number;
+  power_badge?: boolean;
+  score?: number;
+  experimental?: {
+    neynar_user_score?: number;
+    spam_label?: string;
+    spam_label_score?: number;
   };
+  spam_label?: string;
+  spam_label_score?: number;
+};
+
+type NeynarUserEdge = {
+  user?: NeynarUser;
 };
 
 function nowMs() {
   return Date.now();
 }
 
-function safeNumber(n: any): number | null {
-  const v = Number(n);
-  return Number.isFinite(v) ? v : null;
+function toNumber(v: any): number | null {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function getScore(u?: NeynarUser): number | null {
+  if (!u) return null;
+  const a = toNumber((u as any).score);
+  if (a !== null) return a;
+  const b = toNumber((u as any)?.experimental?.neynar_user_score);
+  if (b !== null) return b;
+  const c = toNumber((u as any).neynar_user_score);
+  if (c !== null) return c;
+  return null;
+}
+
+function getSpamLabel(u?: NeynarUser): string | null {
+  if (!u) return null;
+  const a = (u as any)?.spam_label;
+  if (typeof a === "string" && a.trim()) return a.trim();
+  const b = (u as any)?.experimental?.spam_label;
+  if (typeof b === "string" && b.trim()) return b.trim();
+  return null;
+}
+
+function isSpamLabel(label: string | null) {
+  if (!label) return false;
+  const s = label.toLowerCase();
+  return s.includes("spam") || s.includes("bot") || s.includes("scam");
 }
 
 function formatEdge(edge: NeynarUserEdge) {
-  const user = edge.user || {};
+  const u = edge.user || {};
   return {
-    fid: user.fid,
-    username: user.username,
-    display_name: user.display_name || user.username,
-    pfp_url: user.pfp_url,
-    follower_count: user.follower_count || 0,
-    power_badge: user.power_badge || false,
-    neynar_score: user.score || user.experimental?.neynar_user_score || null,
+    fid: u.fid,
+    username: u.username,
+    display_name: u.display_name || u.username,
+    pfp_url: u.pfp_url,
+    follower_count: u.follower_count || 0,
+    power_badge: u.power_badge || false,
+    neynar_score: getScore(u),
+    spam_label: getSpamLabel(u),
   };
 }
 
-async function fetchAllFollowing(args: { requestId: string; fid: number }) {
-  const { requestId, fid } = args;
+function getStrictMinScore(req: NextRequest) {
+  const q = req.nextUrl.searchParams.get("strict_min_score");
+  const fromQuery = toNumber(q);
+  if (fromQuery !== null) return Math.max(0, Math.min(1, fromQuery));
+  const fromEnv = toNumber(process.env.STRICT_MIN_SCORE);
+  if (fromEnv !== null) return Math.max(0, Math.min(1, fromEnv));
+  return 0.6;
+}
+
+function isStrictVisibleFollower(edge: NeynarUserEdge, minScore: number) {
+  const u = edge.user;
+  if (!u?.fid) return false;
+  if (isSpamLabel(getSpamLabel(u))) return false;
+  if (u.power_badge) return true;
+  const score = getScore(u);
+  if (score === null) return false;
+  return score >= minScore;
+}
+
+async function fetchAllFollowing(args: { requestId: string; fid: number; viewerFid?: number }) {
+  const { requestId, fid, viewerFid } = args;
   const started = nowMs();
 
   let cursor: string | null = null;
@@ -53,12 +105,14 @@ async function fetchAllFollowing(args: { requestId: string; fid: number }) {
   do {
     pages += 1;
 
-    const resp: any = await neynarClientRaw.fetchUserFollowing({
-      fid,
-      limit: 100,
-      ...(cursor && { cursor }),
-    } as any);
+    const params: any = { fid, limit: 100 };
+    if (cursor) params.cursor = cursor;
+    if (typeof viewerFid === "number") {
+      params.viewerFid = viewerFid;
+      params.viewer_fid = viewerFid;
+    }
 
+    const resp: any = await neynarClientRaw.fetchUserFollowing(params);
     const batch: NeynarUserEdge[] = resp?.users || [];
     list.push(...batch);
     total += batch.length;
@@ -108,21 +162,14 @@ async function fetchAllFollowers(args: {
   do {
     pages += 1;
 
-    const params: any = {
-      fid,
-      limit: 100,
-      ...(cursor && { cursor }),
-    };
-
-    // Bazı SDK sürümlerinde camelCase / snake_case farkı olabiliyor.
-    // İkisini de gönderiyoruz; SDK hangisini destekliyorsa onu kullanacaktır.
+    const params: any = { fid, limit: 100 };
+    if (cursor) params.cursor = cursor;
     if (typeof viewerFid === "number") {
       params.viewerFid = viewerFid;
       params.viewer_fid = viewerFid;
     }
 
     const resp: any = await client.fetchUserFollowers(params);
-
     const batch: NeynarUserEdge[] = resp?.users || [];
     list.push(...batch);
     total += batch.length;
@@ -160,64 +207,42 @@ export async function GET(req: NextRequest) {
   const started = nowMs();
 
   try {
-    const searchParams = req.nextUrl.searchParams;
-    const fidStr = searchParams.get("fid");
+    const fidStr = req.nextUrl.searchParams.get("fid");
+    const userFid = toNumber(fidStr);
 
-    const userFid = safeNumber(fidStr);
     if (!userFid) {
-      console.log(
-        JSON.stringify({
-          request_id: requestId,
-          event: "bad_request",
-          reason: "missing_fid",
-        })
-      );
-      return NextResponse.json(
-        { error: "FID required", request_id: requestId },
-        { status: 400 }
-      );
+      console.log(JSON.stringify({ request_id: requestId, event: "bad_request", reason: "missing_fid" }));
+      return NextResponse.json({ error: "FID required", request_id: requestId }, { status: 400 });
     }
+
+    const strictMinScore = getStrictMinScore(req);
 
     console.log(
       JSON.stringify({
         request_id: requestId,
         event: "start",
         fid: userFid,
+        strict_min_score: strictMinScore,
       })
     );
 
-    // 0) User profile (score/pp) - visible client kullanıyoruz (daha zengin alanlar dönebiliyor)
-    const { users: userProfiles }: any = await neynarClientVisible.fetchBulkUsers(
-      { fids: [userFid] } as any
-    );
-
+    const { users: userProfiles }: any = await neynarClientVisible.fetchBulkUsers({ fids: [userFid] } as any);
     const userProfile = userProfiles?.[0];
+
     if (!userProfile) {
-      console.log(
-        JSON.stringify({
-          request_id: requestId,
-          event: "profile_missing",
-          fid: userFid,
-        })
-      );
-      return NextResponse.json(
-        { error: "User not found", request_id: requestId },
-        { status: 404 }
-      );
+      console.log(JSON.stringify({ request_id: requestId, event: "profile_missing", fid: userFid }));
+      return NextResponse.json({ error: "User not found", request_id: requestId }, { status: 404 });
     }
 
-    // 1) Following (raw)
-    const following = await fetchAllFollowing({ requestId, fid: userFid });
+    const following = await fetchAllFollowing({ requestId, fid: userFid, viewerFid: userFid });
 
-    // 2a) Followers RAW (ham)
     const rawFollowers = await fetchAllFollowers({
       requestId,
       fid: userFid,
       mode: "raw",
+      viewerFid: userFid,
     });
 
-    // 2b) Followers VISIBLE (client-visible)
-    // viewerFid: kullanıcının kendi fid'i ile "kendi profil görünümü"ne yaklaşmak için
     const visibleFollowers = await fetchAllFollowers({
       requestId,
       fid: userFid,
@@ -225,23 +250,61 @@ export async function GET(req: NextRequest) {
       viewerFid: userFid,
     });
 
-    // 3) Set'ler
     const followingByFid = new Map<number, NeynarUserEdge>();
     for (const edge of following.list) {
-      const f = safeNumber(edge?.user?.fid);
+      const f = toNumber(edge?.user?.fid);
       if (f) followingByFid.set(f, edge);
     }
 
     const rawFollowerFids = new Set<number>();
+    const rawFollowersByFid = new Map<number, NeynarUserEdge>();
     for (const edge of rawFollowers.list) {
-      const f = safeNumber(edge?.user?.fid);
-      if (f) rawFollowerFids.add(f);
+      const f = toNumber(edge?.user?.fid);
+      if (f) {
+        rawFollowerFids.add(f);
+        rawFollowersByFid.set(f, edge);
+      }
     }
 
-    const visibleFollowerFids = new Set<number>();
-    for (const edge of visibleFollowers.list) {
-      const f = safeNumber(edge?.user?.fid);
-      if (f) visibleFollowerFids.add(f);
+    const strictVisibleFollowerFids = new Set<number>();
+    const strictLabelCounts: Record<string, number> = {};
+    let strictVisibleCount = 0;
+    let strictSpamRejected = 0;
+    let strictScoreRejected = 0;
+    let strictMissingScore = 0;
+
+    for (const edge of rawFollowers.list) {
+      const u = edge.user;
+      const fid = toNumber(u?.fid);
+      if (!fid) continue;
+
+      const label = getSpamLabel(u);
+      if (label) strictLabelCounts[label] = (strictLabelCounts[label] || 0) + 1;
+
+      if (isSpamLabel(label)) {
+        strictSpamRejected += 1;
+        continue;
+      }
+
+      if (u?.power_badge) {
+        strictVisibleFollowerFids.add(fid);
+        strictVisibleCount += 1;
+        continue;
+      }
+
+      const score = getScore(u);
+      if (score === null) {
+        strictMissingScore += 1;
+        continue;
+      }
+
+      if (score < strictMinScore) {
+        strictScoreRejected += 1;
+        continue;
+      }
+
+      strictVisibleFollowerFids.add(fid);
+      strictVisibleCount += 1;
     }
 
     console.log(
@@ -250,23 +313,25 @@ export async function GET(req: NextRequest) {
         event: "sets_ready",
         following: followingByFid.size,
         followers_raw: rawFollowerFids.size,
-        followers_visible: visibleFollowerFids.size,
+        followers_visible_experimental: visibleFollowers.total,
+        followers_strict_visible: strictVisibleFollowerFids.size,
+        strict_spam_rejected: strictSpamRejected,
+        strict_score_rejected: strictScoreRejected,
+        strict_missing_score: strictMissingScore,
+        strict_labels: strictLabelCounts,
       })
     );
 
-    // 4) Liste 1: Geri takip etmeyenler (client-visible bazlı)
-    const nonFollowersVisibleEdges: NeynarUserEdge[] = [];
+    const realNonFollowersEdges: NeynarUserEdge[] = [];
     for (const [fid, edge] of followingByFid.entries()) {
-      if (!visibleFollowerFids.has(fid)) nonFollowersVisibleEdges.push(edge);
+      if (!rawFollowerFids.has(fid)) realNonFollowersEdges.push(edge);
     }
 
-    // 5) Liste 2: Farcaster tarafından görünür olmayan (filtreli) hesaplar
-    // = following ∩ (rawFollowers - visibleFollowers)
     const filteredInvisibleEdges: NeynarUserEdge[] = [];
-    for (const edge of nonFollowersVisibleEdges) {
-      const f = safeNumber(edge?.user?.fid);
-      if (f && rawFollowerFids.has(f) && !visibleFollowerFids.has(f)) {
-        filteredInvisibleEdges.push(edge);
+    for (const [fid, edge] of followingByFid.entries()) {
+      if (rawFollowerFids.has(fid) && !strictVisibleFollowerFids.has(fid)) {
+        const followerEdge = rawFollowersByFid.get(fid);
+        filteredInvisibleEdges.push(followerEdge || edge);
       }
     }
 
@@ -274,48 +339,34 @@ export async function GET(req: NextRequest) {
       JSON.stringify({
         request_id: requestId,
         event: "computed",
-        non_followers_visible: nonFollowersVisibleEdges.length,
+        non_followers_real: realNonFollowersEdges.length,
         filtered_invisible: filteredInvisibleEdges.length,
       })
     );
-    
-    const formattedNonFollowers = nonFollowersVisibleEdges.map(formatEdge);
-    const formattedFilteredInvisible = filteredInvisibleEdges.map(formatEdge);
 
     const response = {
       request_id: requestId,
-      nonFollowers: formattedNonFollowers,
-      // Yeni sekme için:
-      filteredInvisible: formattedFilteredInvisible,
+      nonFollowers: realNonFollowersEdges.map(formatEdge),
+      filteredInvisible: filteredInvisibleEdges.map(formatEdge),
       stats: {
         following: following.total,
-        // Geriye dönük alan: UI bunu kullanıyor
-        followers: visibleFollowers.total,
-        nonFollowersCount: nonFollowersVisibleEdges.length,
-        // Yeni alanlar:
-        followers_visible: visibleFollowers.total,
         followers_raw: rawFollowers.total,
+        followers_visible_experimental: visibleFollowers.total,
+        followers_strict_visible: strictVisibleFollowerFids.size,
+        nonFollowersCount: realNonFollowersEdges.length,
         filteredInvisibleCount: filteredInvisibleEdges.length,
+        strict_min_score: strictMinScore,
       },
       userProfile: {
         fid: userProfile.fid,
         username: userProfile.username,
         display_name: userProfile.display_name || userProfile.username,
         pfp_url: userProfile.pfp_url,
-        neynar_score:
-          userProfile.score ||
-          userProfile.experimental?.neynar_user_score ||
-          null,
+        neynar_score: userProfile.score || userProfile.experimental?.neynar_user_score || null,
       },
     };
 
-    console.log(
-      JSON.stringify({
-        request_id: requestId,
-        event: "done",
-        ms: nowMs() - started,
-      })
-    );
+    console.log(JSON.stringify({ request_id: requestId, event: "done", ms: nowMs() - started }));
 
     return NextResponse.json(response);
   } catch (error: any) {
@@ -327,9 +378,6 @@ export async function GET(req: NextRequest) {
         stack: error?.stack,
       })
     );
-    return NextResponse.json(
-      { error: error?.message || "Failed to fetch list", request_id: requestId },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error?.message || "Failed", request_id: requestId }, { status: 500 });
   }
 }
