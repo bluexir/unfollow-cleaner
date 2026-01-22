@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { neynarClient } from '@/lib/neynar';
+import {
+  FarcasterNetwork,
+  makeLinkRemove,
+  NobleEd25519Signer,
+} from '@farcaster/hub-nodejs';
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,25 +23,70 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log('[UNFOLLOW] Başlatılıyor, Signer:', signer_uuid);
+    console.log('[UNFOLLOW] Başlatılıyor, Token:', signer_uuid);
     console.log('[UNFOLLOW] Hedef sayısı:', target_fids.length);
+
+    const statusResponse = await fetch(
+      `https://api.warpcast.com/v2/signed-key-request?token=${signer_uuid}`
+    );
+
+    if (!statusResponse.ok) {
+      return NextResponse.json(
+        { error: 'Signer bulunamadı veya onaylanmamış' },
+        { status: 400 }
+      );
+    }
+
+    const statusData = await statusResponse.json();
+    const userFid = statusData.result.signedKeyRequest.userFid;
+    const publicKey = statusData.result.signedKeyRequest.key;
+
+    console.log('[UNFOLLOW] User FID:', userFid);
 
     const results = [];
     const errors = [];
 
-    // Her bir FID için unfollow işlemi
     for (const targetFid of target_fids) {
       try {
-        // SDK v3 OBJECT FORMAT
-        const response = await neynarClient.unfollowUser({
-          signerUuid: signer_uuid,
-          targetFids: [targetFid]
+        const privateKeyHex = process.env[`SIGNER_KEY_${signer_uuid}`];
+        
+        if (!privateKeyHex) {
+          throw new Error('Signer private key bulunamadı');
+        }
+
+        const privateKeyBytes = Buffer.from(privateKeyHex, 'hex');
+        const signer = new NobleEd25519Signer(privateKeyBytes);
+
+        const linkRemove = await makeLinkRemove(
+          {
+            type: 'follow',
+            targetFid: targetFid,
+          },
+          { fid: userFid, network: FarcasterNetwork.MAINNET },
+          signer
+        );
+
+        if (linkRemove.isErr()) {
+          throw new Error(linkRemove.error.message);
+        }
+
+        const messageBytes = linkRemove.value.toJSON();
+        const response = await fetch('https://hub.farcaster.xyz:2281/v1/submitMessage', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/octet-stream',
+          },
+          body: Buffer.from(messageBytes),
         });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText);
+        }
 
         console.log('[UNFOLLOW] Başarılı:', targetFid);
         results.push({ fid: targetFid, success: true });
 
-        // Rate limit için 150ms bekle
         await new Promise(resolve => setTimeout(resolve, 150));
 
       } catch (err: any) {
