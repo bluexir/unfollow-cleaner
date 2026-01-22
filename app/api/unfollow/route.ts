@@ -7,11 +7,11 @@ import {
 
 export async function POST(req: NextRequest) {
   try {
-    const { signer_uuid, target_fids } = await req.json();
+    const { signer_private_key, user_fid, target_fids } = await req.json();
 
-    if (!signer_uuid) {
+    if (!signer_private_key || !user_fid) {
       return NextResponse.json(
-        { error: 'signer_uuid gerekli' },
+        { error: 'signer_private_key and user_fid gerekli' },
         { status: 400 }
       );
     }
@@ -23,46 +23,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log('[UNFOLLOW] Başlatılıyor, Token:', signer_uuid);
+    console.log('[UNFOLLOW] Başlatılıyor, User FID:', user_fid);
     console.log('[UNFOLLOW] Hedef sayısı:', target_fids.length);
 
-    const statusResponse = await fetch(
-      `https://api.warpcast.com/v2/signed-key-request?token=${signer_uuid}`
-    );
-
-    if (!statusResponse.ok) {
-      return NextResponse.json(
-        { error: 'Signer bulunamadı veya onaylanmamış' },
-        { status: 400 }
-      );
-    }
-
-    const statusData = await statusResponse.json();
-    const userFid = statusData.result.signedKeyRequest.userFid;
-    const publicKey = statusData.result.signedKeyRequest.key;
-
-    console.log('[UNFOLLOW] User FID:', userFid);
+    const privateKeyBytes = Buffer.from(signer_private_key.replace('0x', ''), 'hex');
+    const signer = new NobleEd25519Signer(privateKeyBytes);
 
     const results = [];
     const errors = [];
 
     for (const targetFid of target_fids) {
       try {
-        const privateKeyHex = process.env[`SIGNER_KEY_${signer_uuid}`];
-        
-        if (!privateKeyHex) {
-          throw new Error('Signer private key bulunamadı');
-        }
-
-        const privateKeyBytes = Buffer.from(privateKeyHex, 'hex');
-        const signer = new NobleEd25519Signer(privateKeyBytes);
-
         const linkRemove = await makeLinkRemove(
           {
             type: 'follow',
             targetFid: targetFid,
           },
-          { fid: userFid, network: FarcasterNetwork.MAINNET },
+          { fid: user_fid, network: FarcasterNetwork.MAINNET },
           signer
         );
 
