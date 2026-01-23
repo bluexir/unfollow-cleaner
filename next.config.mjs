@@ -1,4 +1,5 @@
-/** @type {import('next').NextConfig} */
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 const nextConfig = {
   images: {
     remotePatterns: [
