@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { neynarClient } from '@/lib/neynar';
 
 export async function GET(req: NextRequest) {
   try {
@@ -16,46 +17,29 @@ export async function GET(req: NextRequest) {
 
     console.log('[CHECK-SIGNER] Kontrol ediliyor:', signer_uuid);
 
-    const response = await fetch(
-      `https://api.warpcast.com/v2/signed-key-request?token=${signer_uuid}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    // Neynar SDK v3: camelCase kullanır
+    const signer = await neynarClient.lookupSigner({
+      signerUuid: signer_uuid
+    });
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        return NextResponse.json(
-          { status: 'not_found' },
-          { status: 404 }
-        );
-      }
-      const errorText = await response.text();
-      console.error('[CHECK-SIGNER] API Error:', errorText);
-      return NextResponse.json(
-        { error: 'API error', details: errorText },
-        { status: response.status }
-      );
-    }
-
-    const data = await response.json();
-    const state = data.result.signedKeyRequest.state;
-    const userFid = data.result.signedKeyRequest.userFid;
-
-    console.log('[CHECK-SIGNER] State:', state);
-    console.log('[CHECK-SIGNER] User FID:', userFid);
+    console.log('[CHECK-SIGNER] Status:', signer.status);
+    console.log('[CHECK-SIGNER] FID:', signer.fid);
 
     return NextResponse.json({
-      status: state === 'completed' ? 'approved' : 'pending',
-      fid: userFid
+      status: signer.status,
+      fid: signer.fid
     });
 
   } catch (error: any) {
     console.error('[CHECK-SIGNER] Hata:', error);
     
+    if (error.message?.includes('not found') || error.message?.includes('404')) {
+      return NextResponse.json(
+        { status: 'not_found' },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json(
       { error: error.message || 'Signer kontrolü başarısız' },
       { status: 500 }
