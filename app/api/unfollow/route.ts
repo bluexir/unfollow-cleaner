@@ -1,19 +1,13 @@
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  FarcasterNetwork,
-  makeLinkRemove,
-  NobleEd25519Signer,
-} from '@farcaster/hub-nodejs';
+import { neynarClient } from '@/lib/neynar';
 
 export async function POST(req: NextRequest) {
   try {
-    const { signer_private_key, user_fid, target_fids } = await req.json();
+    const { signer_uuid, target_fids } = await req.json();
 
-    if (!signer_private_key || !user_fid) {
+    if (!signer_uuid) {
       return NextResponse.json(
-        { error: 'signer_private_key and user_fid gerekli' },
+        { error: 'signer_uuid gerekli' },
         { status: 400 }
       );
     }
@@ -25,47 +19,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log('[UNFOLLOW] Başlatılıyor, User FID:', user_fid);
+    console.log('[UNFOLLOW] Başlatılıyor, Signer:', signer_uuid);
     console.log('[UNFOLLOW] Hedef sayısı:', target_fids.length);
-
-    const privateKeyBytes = Buffer.from(signer_private_key.replace('0x', ''), 'hex');
-    const signer = new NobleEd25519Signer(privateKeyBytes);
 
     const results = [];
     const errors = [];
 
+    // Her bir FID için unfollow işlemi
     for (const targetFid of target_fids) {
       try {
-        const linkRemove = await makeLinkRemove(
-          {
-            type: 'follow',
-            targetFid: targetFid,
-          },
-          { fid: user_fid, network: FarcasterNetwork.MAINNET },
-          signer
-        );
-
-        if (linkRemove.isErr()) {
-          throw new Error(linkRemove.error.message);
-        }
-
-        const messageBytes = linkRemove.value.toJSON();
-        const response = await fetch('https://hub.farcaster.xyz:2281/v1/submitMessage', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/octet-stream',
-          },
-          body: Buffer.from(messageBytes),
+        // SDK v3 OBJECT FORMAT
+        const response = await neynarClient.unfollowUser({
+          signerUuid: signer_uuid,
+          targetFids: [targetFid]
         });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText);
-        }
 
         console.log('[UNFOLLOW] Başarılı:', targetFid);
         results.push({ fid: targetFid, success: true });
 
+        // Rate limit için 150ms bekle
         await new Promise(resolve => setTimeout(resolve, 150));
 
       } catch (err: any) {
