@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import * as ed from '@noble/ed25519';
 import { mnemonicToAccount } from 'viem/accounts';
