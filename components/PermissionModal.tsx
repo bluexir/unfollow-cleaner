@@ -164,6 +164,13 @@ export default function PermissionModal({ userFid, onPermissionGranted, onClose 
               alt="QR Code"
               className="w-full h-auto"
             />
+
+            <button
+              onClick={() => window.location.href = signerData.signer_approval_url}
+              className="w-full mt-4 bg-gray-900 hover:bg-gray-800 text-white font-semibold px-4 py-3 rounded-xl transition-all active:scale-95"
+            >
+              Open Approval Link
+            </button>
           </div>
         )}
 
