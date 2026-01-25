@@ -26,7 +26,7 @@ export async function GET() {
         "https://unfollow-cleaner.vercel.app/screenshot-2.jpeg",
         "https://unfollow-cleaner.vercel.app/screenshot-3.jpeg"
       ],
-      castShareUrl: "https://farcaster.xyz/miniapps/Wh66UZgEFojt/unfollow-cleaner",
+      castShareUrl: "https://unfollow-cleaner.vercel.app",
       primaryCategory: "social",
       tags: ["social", "analytics", "followers", "unfollow"],
       tagline: "Farcaster Unfollow Tool",
