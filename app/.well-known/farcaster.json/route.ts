@@ -12,25 +12,28 @@ export async function GET() {
       name: "Unfollow Cleaner",
       iconUrl: "https://unfollow-cleaner.vercel.app/icon.png",
       homeUrl: "https://unfollow-cleaner.vercel.app",
-      imageUrl: "https://unfollow-cleaner.vercel.app/icon.png",              
+      imageUrl: "https://unfollow-cleaner.vercel.app/icon.png",
+      heroImageUrl: "https://unfollow-cleaner.vercel.app/icon.png",
       splashImageUrl: "https://unfollow-cleaner.vercel.app/icon.png",
       splashBackgroundColor: "#0f1117",
       webhookUrl: "https://unfollow-cleaner.vercel.app/api/webhook",
       public: true,
       subtitle: "Find your ghosts on Farcaster",
       description: "Discover who doesn't follow you back on Farcaster. Clean up with one tap.",
-      buttonTitle: "Find Ghosts",                                           
-      screenshotUrls: [                                                     
+      buttonTitle: "Find Ghosts",
+      screenshotUrls: [
         "https://unfollow-cleaner.vercel.app/screenshot-1.jpeg",
-        "https://unfollow-cleaner.vercel.app/screenshot-2.jpeg"
+        "https://unfollow-cleaner.vercel.app/screenshot-2.jpeg",
+        "https://unfollow-cleaner.vercel.app/screenshot-3.jpeg"
       ],
+      castShareUrl: "https://farcaster.xyz/miniapps/Wh66UZgEFojt/unfollow-cleaner",
       primaryCategory: "social",
       tags: ["social", "analytics", "followers", "unfollow"],
       tagline: "Farcaster Unfollow Tool",
       ogTitle: "Unfollow Cleaner",
       ogDescription: "Find and clean your ghosts.",
       ogImageUrl: "https://unfollow-cleaner.vercel.app/icon.png",
-      castBrandId: "unfollow-cleaner"                                        
+      castBrandId: "unfollow-cleaner"
     }
   };
 
