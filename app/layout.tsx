@@ -15,9 +15,9 @@ const embedData = {
       name: "Unfollow Cleaner",
       url: "https://unfollow-cleaner.vercel.app",
       splashImageUrl: "https://unfollow-cleaner.vercel.app/icon.png",
-      splashBackgroundColor: "#0f1117"
-    }
-  }
+      splashBackgroundColor: "#0f1117",
+    },
+  },
 };
 
 const frameData = {
@@ -26,15 +26,15 @@ const frameData = {
     ...embedData.button,
     action: {
       ...embedData.button.action,
-      type: "launch_frame"
-    }
-  }
+      type: "launch_frame",
+    },
+  },
 };
 
 export const metadata: Metadata = {
   title: "Unfollow Cleaner",
   description: "Farcaster Follower Management Tool - Find and unfollow non-followers",
-  
+
   openGraph: {
     title: "Unfollow Cleaner",
     description: "Find and unfollow non-followers",
@@ -47,12 +47,12 @@ export const metadata: Metadata = {
       },
     ],
   },
-  
+
   other: {
     "fc:miniapp": JSON.stringify(embedData),
     "fc:frame": JSON.stringify(frameData),
   },
-  
+
   manifest: "/manifest.json",
 };
 
@@ -63,6 +63,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* Base App domain ownership / app verification */}
+        <meta name="base:app_id" content="698b75ebabdd1887a89d9903" />
+      </head>
+
       <body className={`${inter.className} bg-black text-white min-h-screen`}>
         <Providers>{children}</Providers>
       </body>
