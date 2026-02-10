@@ -3,9 +3,11 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   const manifest = {
     accountAssociation: {
-      header: "eyJmaWQiOjQyOTk3MywidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweGI3YkEyNTk3NjI0MTRFMjRGOTI0MTVFRjc4MDE5Y2RjM2FlM0M5ZEUifQ",
+      header:
+        "eyJmaWQiOjQyOTk3MywidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweGI3YkEyNTk3NjI0MTRFMjRGOTI0MTVFRjc4MDE5Y2RjM2FlM0M5ZEUifQ",
       payload: "eyJkb21haW4iOiJ1bmZvbGxvdy1jbGVhbmVyLnZlcmNlbC5hcHAifQ",
-      signature: "PqaN7O2suobRJQs8X1dzrgIfw38dfdgD40O3AhdXX4JuhiAMtWS6vaqdyY3Gth9aJGc1SrbvGRV9acu0+BaLrRw="
+      signature:
+        "PqaN7O2suobRJQs8X1dzrgIfw38dfdgD40O3AhdXX4JuhiAMtWS6vaqdyY3Gth9aJGc1SrbvGRV9acu0+BaLrRw=",
     },
     miniapp: {
       version: "1",
@@ -18,16 +20,23 @@ export async function GET() {
       splashBackgroundColor: "#0f1117",
       webhookUrl: "https://unfollow-cleaner.vercel.app/api/webhook",
       public: true,
-      
+
+      // DEFAULT: include in search results
+      // true = exclude from search results
+      // false = include in search results (default)
+      noindex: false,
+
+      // max 30 chars, no emoji, no special chars
       subtitle: "Find ghosts on Base Farcaster",
 
-      description: "Discover who doesn't follow you back on Base & Farcaster. Clean up with one tap.",
+      description:
+        "Discover who doesn't follow you back on Base & Farcaster. Clean up with one tap.",
 
       buttonTitle: "Find Ghosts",
       screenshotUrls: [
         "https://unfollow-cleaner.vercel.app/screenshot-1.jpeg",
         "https://unfollow-cleaner.vercel.app/screenshot-2.jpeg",
-        "https://unfollow-cleaner.vercel.app/screenshot-3.jpeg"
+        "https://unfollow-cleaner.vercel.app/screenshot-3.jpeg",
       ],
       castShareUrl: "https://unfollow-cleaner.vercel.app",
       primaryCategory: "social",
@@ -36,8 +45,8 @@ export async function GET() {
       ogTitle: "Unfollow Cleaner",
       ogDescription: "Find and clean your ghosts.",
       ogImageUrl: "https://unfollow-cleaner.vercel.app/icon.png",
-      castBrandId: "unfollow-cleaner"
-    }
+      castBrandId: "unfollow-cleaner",
+    },
   };
 
   return NextResponse.json(manifest, {
