@@ -30,7 +30,7 @@ export async function GET() {
       subtitle: "Find ghosts on Base Farcaster",
 
       description:
-        "Discover who doesn't follow you back on Base & Farcaster. Clean up with one tap.",
+        "Discover who doesn't follow you back on Base and Farcaster. Clean up with one tap.",
 
       buttonTitle: "Find Ghosts",
       screenshotUrls: [
@@ -41,7 +41,7 @@ export async function GET() {
       castShareUrl: "https://unfollow-cleaner.vercel.app",
       primaryCategory: "social",
       tags: ["social", "analytics", "followers", "unfollow"],
-      tagline: "Base & Farcaster Unfollow Tool",
+      tagline: "Base Farcaster Unfollow Tool",
       ogTitle: "Unfollow Cleaner",
       ogDescription: "Find and clean your ghosts.",
       ogImageUrl: "https://unfollow-cleaner.vercel.app/icon.png",
