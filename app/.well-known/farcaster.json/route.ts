@@ -19,8 +19,6 @@ export async function GET() {
       webhookUrl: "https://unfollow-cleaner.vercel.app/api/webhook",
       public: true,
       
-      noindex: default,
-      
       subtitle: "Find ghosts on Base Farcaster",
 
       description: "Discover who doesn't follow you back on Base & Farcaster. Clean up with one tap.",
